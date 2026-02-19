@@ -50,7 +50,7 @@ dependencies {
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
 
     // NewPipe Extractor — YouTube search + stream URL extraction
-    implementation('com.github.TeamNewPipe:NewPipeExtractor:v0.24.1')
+    implementation('com.github.TeamNewPipe:NewPipeExtractor:v0.25.2')
 
     // OkHttp — downloading audio streams with progress
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
