@@ -70,16 +70,33 @@ class YoutubeHelper {
     }
 
     /**
-     * Get the best audio-only stream URL for a given YouTube video URL.
+     * Get the best audio stream URL for a given YouTube video URL.
+     * Falls back to video streams if no audio-only streams exist.
+     * Returns Pair(url, errorMsg) — url is null on failure.
      */
-    fun getAudioStreamUrl(videoUrl: String): String? {
+    fun getAudioStreamUrl(videoUrl: String): Pair<String?, String?> {
         return try {
             val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
-            info.audioStreams
+
+            // Try audio-only streams first (best quality)
+            val audioUrl = info.audioStreams
+                ?.filter { it.content != null && it.content.isNotEmpty() }
                 ?.maxByOrNull { it.averageBitrate }
                 ?.content
+
+            if (audioUrl != null) return Pair(audioUrl, null)
+
+            // Fallback: try video streams (they contain audio too)
+            val videoUrl2 = info.videoStreams
+                ?.filter { it.content != null && it.content.isNotEmpty() }
+                ?.firstOrNull()
+                ?.content
+
+            if (videoUrl2 != null) return Pair(videoUrl2, null)
+
+            Pair(null, "No audio or video streams found for this video")
         } catch (e: Exception) {
-            null
+            Pair(null, e.message ?: "Unknown error extracting stream")
         }
     }
 

@@ -448,6 +448,7 @@
 
     function getAngle(x, y) { const r = wheel.getBoundingClientRect(); return Math.atan2(y - r.top - r.height / 2, x - r.left - r.width / 2) * (180 / Math.PI); }
     function handleScroll(dir) {
+        if (navigator.vibrate) navigator.vibrate(8);
         if (currentView === 'menu') { dir > 0 ? menuDown() : menuUp(); }
         else if (currentView === 'library') { dir > 0 ? libDown() : libUp(); }
         else if (currentView === 'nowplaying') { audio.volume = Math.max(0, Math.min(1, audio.volume + dir * -0.05)); showToast('Vol: ' + Math.round(audio.volume * 100) + '%'); }

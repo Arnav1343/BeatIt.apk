@@ -48,8 +48,10 @@ class DownloadManager(
         try {
             // Step 1: Get audio stream URL from YouTube
             tasks[taskId] = TaskStatus("downloading", 5)
-            val streamUrl = youtubeHelper.getAudioStreamUrl(videoUrl)
-                ?: throw IOException("Could not get audio stream URL")
+            val (streamUrl, streamError) = youtubeHelper.getAudioStreamUrl(videoUrl)
+            if (streamUrl == null) {
+                throw IOException(streamError ?: "Could not get audio stream URL")
+            }
 
             // Step 2: Download audio directly
             // YouTube serves audio as opus/webm or m4a — we save it with the requested extension.
