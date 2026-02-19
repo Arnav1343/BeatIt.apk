@@ -13,3 +13,11 @@ Thumbs.db
 dist/
 build/
 .cache/
+
+# Android
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aab

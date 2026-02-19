@@ -1,0 +1,14 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# APK (we keep the release APK in releases/)
+*.apk
+!releases/*.apk
