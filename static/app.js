@@ -46,56 +46,43 @@
     let isShuffle = false;
     let isRepeat = false;
     let isDark = localStorage.getItem('ipod-theme') === 'dark';
-    let selectedQuality = 192;
 
     // ─── Theme System ───────────────────────────────────────────────
     const themes = [
-        { id: 'light', name: 'Light', dark: false },
-        { id: 'dark', name: 'Dark', dark: true },
-        { id: 'cyber', name: 'Cyber Violet', dark: true },
-        { id: 'neon', name: 'Neon Emerald', dark: true },
-        { id: 'molten', name: 'Molten', dark: true },
-        { id: 'sand', name: 'Sand', dark: false },
-        { id: 'ocean', name: 'Ocean', dark: false },
-        { id: 'rose', name: 'Rosé', dark: false },
+        { id: 'default', name: 'Pink / Black', dark: true },
+        { id: 'charcoal', name: 'Charcoal / Peach', dark: true },
+        { id: 'neon', name: 'Neon Green / Jet Black', dark: true },
+        { id: 'purple', name: 'Purple / Black', dark: true },
+        { id: 'deeppurple', name: 'Deep Purple / Rose Gold', dark: true },
     ];
     let currentThemeIndex = 0;
     const savedTheme = localStorage.getItem('ipod-theme-id');
     if (savedTheme) {
         const idx = themes.findIndex(t => t.id === savedTheme);
         if (idx >= 0) currentThemeIndex = idx;
-    } else if (isDark) {
-        currentThemeIndex = 1;
     }
 
     function applyTheme() {
         const t = themes[currentThemeIndex];
-        if (t.id === 'light') {
+        if (t.id === 'default') {
             document.body.removeAttribute('data-theme');
         } else {
             document.body.setAttribute('data-theme', t.id);
         }
-        // Update sun/moon icon based on whether theme is dark
-        themeIconSun.style.display = t.dark ? 'none' : 'block';
-        themeIconMoon.style.display = t.dark ? 'block' : 'none';
         localStorage.setItem('ipod-theme-id', t.id);
+        // Update icon visibility
+        if (themeIconSun) themeIconSun.style.display = 'none';
+        if (themeIconMoon) themeIconMoon.style.display = 'block';
     }
 
-    // Light/dark toggle — swaps between light and the last-used dark theme (or vice versa)
+    // Light/dark toggle — cycles through all 5 themes
     themeToggle.addEventListener('click', () => {
-        const current = themes[currentThemeIndex];
-        if (current.dark) {
-            // Switch to light
-            currentThemeIndex = 0;
-        } else {
-            // Switch to dark (default)
-            currentThemeIndex = 1;
-        }
+        currentThemeIndex = (currentThemeIndex + 1) % themes.length;
         applyTheme();
         showToast(themes[currentThemeIndex].name);
     });
 
-    // Theme cycle button — rotates through all 8 themes
+    // Theme cycle button — also cycles
     const themeCycleBtn = $('#themeCycle');
     themeCycleBtn.addEventListener('click', () => {
         currentThemeIndex = (currentThemeIndex + 1) % themes.length;
@@ -238,7 +225,22 @@
         } finally { hideLoading(); }
     }
 
-    // ─── Quality Selector ───────────────────────────────────────────
+    // ─── Format + Quality Selector ──────────────────────────────────
+    const CODEC_OPTIONS = {
+        mp3: [
+            { q: 320, label: 'High', detail: '320 kbps' },
+            { q: 192, label: 'Medium', detail: '192 kbps' },
+            { q: 128, label: 'Low', detail: '128 kbps' },
+        ],
+        opus: [
+            { q: 160, label: 'High', detail: '160 kbps' },
+            { q: 128, label: 'Medium', detail: '128 kbps', default: true },
+            { q: 96, label: 'Low', detail: '96 kbps' },
+        ],
+    };
+    let selectedCodec = 'mp3';
+    let selectedQuality = 320;
+
     function estimateSize(durationSec, kbps) {
         if (!durationSec) return '—';
         const bytes = (kbps * 1000 / 8) * durationSec;
@@ -246,27 +248,61 @@
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
-    function updateQualitySizes(duration) {
+    function renderQualityOptions() {
+        const opts = CODEC_OPTIONS[selectedCodec];
+        const defOpt = opts.find(o => o.default) || opts[0];
+        selectedQuality = selectedQuality; // keep previous if valid, else use default
+        const validQs = opts.map(o => o.q);
+        if (!validQs.includes(selectedQuality)) selectedQuality = defOpt.q;
+
+        const dur = lastSearchResult?.duration || 0;
+        const container = $('#qualityOptions');
+        container.innerHTML = opts.map(o => {
+            const sz = estimateSize(dur, o.q);
+            const active = o.q === selectedQuality ? 'active' : '';
+            return `<button class="quality-opt ${active}" data-quality="${o.q}">
+                <span class="q-name">${o.label}</span>
+                <span class="q-detail">${o.detail} · <span class="q-size">${sz}</span></span>
+            </button>`;
+        }).join('');
+
         $$('.quality-opt').forEach(btn => {
-            const kbps = parseInt(btn.dataset.quality);
-            btn.querySelector('.q-size').textContent = estimateSize(duration, kbps);
+            btn.addEventListener('click', () => {
+                $$('.quality-opt').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedQuality = parseInt(btn.dataset.quality);
+            });
         });
     }
 
-    $$('.quality-opt').forEach(btn => {
+    function updateQualitySizes(duration) {
+        $$('.quality-opt').forEach(btn => {
+            const kbps = parseInt(btn.dataset.quality);
+            const sz = btn.querySelector('.q-size');
+            if (sz) sz.textContent = estimateSize(duration, kbps);
+        });
+    }
+
+    // Format toggle (MP3 / Opus)
+    $$('.fmt-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            $$('.quality-opt').forEach(b => b.classList.remove('active'));
+            $$('.fmt-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            selectedQuality = parseInt(btn.dataset.quality);
+            selectedCodec = btn.dataset.codec;
+            renderQualityOptions();
         });
     });
+
+    // Initial render with MP3 defaults
+    renderQualityOptions();
 
     async function doDownload() {
         if (!lastSearchResult) return;
         downloadBtn.disabled = true; downloadStatus.textContent = 'Starting...'; downloadStatus.className = 'download-status';
         downloadProgressWrap.classList.remove('hidden'); downloadProgressFill.style.width = '0%'; downloadProgressText.textContent = '0%';
         try {
-            const r = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: lastSearchResult.url, title: lastSearchResult.title, quality: selectedQuality }) });
+            const payload = { url: lastSearchResult.url, title: lastSearchResult.title, quality: selectedQuality, codec: selectedCodec };
+            const r = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const d = await r.json();
             if (d.error) { downloadStatus.textContent = d.error; downloadStatus.className = 'download-status error'; downloadProgressWrap.classList.add('hidden'); downloadBtn.disabled = false; return; }
             pollProgress(d.task_id);

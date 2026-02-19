@@ -87,20 +87,14 @@
             <div class="result-title" id="resultTitle"></div>
             <div class="result-meta" id="resultMeta"></div>
             <div class="quality-selector" id="qualitySelector">
-              <div class="quality-label">Quality</div>
-              <div class="quality-options">
-                <button class="quality-opt" data-quality="320" data-label="High">
-                  <span class="q-name">High</span>
-                  <span class="q-detail">320kbps · <span class="q-size"></span></span>
-                </button>
-                <button class="quality-opt active" data-quality="192" data-label="Medium">
-                  <span class="q-name">Medium</span>
-                  <span class="q-detail">192kbps · <span class="q-size"></span></span>
-                </button>
-                <button class="quality-opt" data-quality="128" data-label="Low">
-                  <span class="q-name">Low</span>
-                  <span class="q-detail">128kbps · <span class="q-size"></span></span>
-                </button>
+              <div class="format-toggle-row">
+                <button class="fmt-btn active" id="fmtMp3" data-codec="mp3">MP3</button>
+                <button class="fmt-btn" id="fmtOpus" data-codec="opus">Opus <span class="fmt-badge">~60%
+                    smaller</span></button>
+              </div>
+              <div class="quality-label" id="qualityLabel">Quality</div>
+              <div class="quality-options" id="qualityOptions">
+                <!-- populated by JS based on selected codec -->
               </div>
             </div>
             <button id="downloadBtn" class="download-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"

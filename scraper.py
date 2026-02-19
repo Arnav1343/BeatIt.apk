@@ -1,13 +1,13 @@
 """
-Song-to-MP3 Scraper  (Max-Quality Edition)
-===========================================
+Song Audio Scraper
+==================
 Uses yt-dlp to search YouTube for a song by name and download it as a
-maximum-quality MP3 file via ffmpeg post-processing.
+high-quality audio file (MP3 or Opus) via ffmpeg post-processing.
 
 Quality features:
   - Prefers the highest-bitrate source audio stream (opus/m4a)
-  - 320 kbps CBR MP3 with highest-quality VBR algorithm layered on top
-  - Full stereo encoding (no joint-stereo downmix)
+  - MP3: up to 320 kbps CBR, full stereo
+  - Opus: transparent quality at 128 kbps (~60% smaller than 320kbps MP3)
   - Embeds album-art thumbnail and metadata (title, artist, etc.)
   - Concurrent fragment downloads for maximum speed
 """
@@ -45,14 +45,22 @@ class SongScraper:
         re.IGNORECASE,
     )
 
-    def __init__(self, quality: int = 320):
+    def __init__(self, quality: int = 320, codec: str = "mp3"):
         """
         Args:
-            quality: MP3 bitrate in kbps (128, 192, 256, or 320).
+            quality: Audio bitrate in kbps.
+                     MP3 valid values: 128, 192, 256, 320.
+                     Opus valid values: 64, 96, 128, 160 (128 recommended).
+            codec:   'mp3' or 'opus'.
         """
-        if quality not in (128, 192, 256, 320):
-            raise ValueError(f"Invalid quality {quality}. Choose 128, 192, 256, or 320.")
+        if codec not in ("mp3", "opus"):
+            raise ValueError(f"Invalid codec '{codec}'. Choose 'mp3' or 'opus'.")
+        if codec == "mp3" and quality not in (128, 192, 256, 320):
+            raise ValueError(f"Invalid MP3 quality {quality}. Choose 128, 192, 256, or 320.")
+        if codec == "opus" and quality not in (64, 96, 128, 160, 192):
+            raise ValueError(f"Invalid Opus quality {quality}. Choose 64, 96, 128, or 160.")
         self.quality = quality
+        self.codec = codec
 
     # ------------------------------------------------------------------
     # Search
@@ -160,90 +168,87 @@ class SongScraper:
         progress_hook=None,
     ) -> Path:
         """
-        Download audio from a URL and convert to MP3.
+        Download audio from a URL and convert to MP3 or Opus.
 
         Args:
             url:           YouTube video URL.
-            output_dir:    Directory to save the MP3 to.
+            output_dir:    Directory to save the audio file.
             progress_hook: Optional callable(dict) for progress updates.
 
         Returns:
-            Path to the saved .mp3 file.
+            Path to the saved audio file (.mp3 or .opus).
         """
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # yt-dlp template – will produce <title>.mp3
-        outtmpl = str(output_dir / "%(title)s.%(ext)s")
+        outtmpl = str(output_dir / "%(title).200B.%(ext)s")
 
-        ydl_opts = {
-            # ── Source format: prefer highest-bitrate audio ──────────
-            "format": "bestaudio[asr>=44100]/bestaudio/best",
-            "format_sort": ["abr", "asr"],   # sort by audio bitrate then sample rate
-            "outtmpl": outtmpl,
-            "noplaylist": True,
-            "quiet": True,
-            "no_warnings": True,
-
-            # ── Speed: concurrent fragment downloads ────────────────
-            "concurrent_fragment_downloads": 4,
-            "buffersize": 1024 * 64,          # 64 KB buffer
-
-            # ── Thumbnail for album art embedding ───────────────────
-            "writethumbnail": True,
-
-            # ── Post-processors (order matters) ─────────────────────
-            "postprocessors": [
-                # 1. Extract audio → MP3 at max bitrate
+        if self.codec == "opus":
+            # ── Opus path: keep native opus stream when available ────
+            # YouTube already encodes in opus/webm; we re-encode to a
+            # standalone .opus container at the target bitrate.
+            postprocessors = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "opus",
+                    "preferredquality": str(self.quality),
+                },
+                {"key": "FFmpegMetadata", "add_metadata": True},
+            ]
+            # Opus bitrate via libopus (VBR for best quality/size ratio)
+            pp_args = {
+                "extractaudio": ["-b:a", f"{self.quality}k", "-vbr", "on"],
+            }
+        else:
+            # ── MP3 path (original, max-quality) ────────────────────
+            postprocessors = [
                 {
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
                     "preferredquality": str(self.quality),
                 },
-                # 2. Embed metadata (title, artist, album, etc.)
-                {
-                    "key": "FFmpegMetadata",
-                    "add_metadata": True,
-                },
-                # 3. Embed thumbnail as album art
-                {
-                    "key": "EmbedThumbnail",
-                    "already_have_thumbnail": False,
-                },
-            ],
+                {"key": "FFmpegMetadata", "add_metadata": True},
+                {"key": "EmbedThumbnail", "already_have_thumbnail": False},
+            ]
+            # Force CBR + full stereo for MP3
+            pp_args = {
+                "extractaudio": ["-b:a", f"{self.quality}k", "-joint_stereo", "0"],
+            }
 
-            # ── FFmpeg encoding args for maximum quality ────────────
-            # -b:a 320k = force constant 320 kbps bitrate (max for MP3)
-            # -joint_stereo 0 = full stereo (no mid/side downmix)
-            "postprocessor_args": {
-                "extractaudio": ["-b:a", "320k", "-joint_stereo", "0"],
-            },
-
-            # Restrict filenames to safe characters on Windows
-            "restrictfilenames": False,
+        ydl_opts = {
+            "format": "bestaudio[asr>=44100]/bestaudio/best",
+            "format_sort": ["abr", "asr"],
+            "outtmpl": outtmpl,
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "concurrent_fragment_downloads": 4,
+            "buffersize": 1024 * 64,
+            "writethumbnail": True,
+            "postprocessors": postprocessors,
+            "postprocessor_args": pp_args,
+            "restrictfilenames": True,
             "windowsfilenames": True,
         }
 
         if progress_hook:
             ydl_opts["progress_hooks"] = [progress_hook]
 
-        logger.info("Downloading: %s -> %s", url, output_dir)
+        logger.info("Downloading [%s %skbps]: %s -> %s", self.codec, self.quality, url, output_dir)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        # Determine the final filename produced by yt-dlp
-        # yt-dlp may sanitise the title; we look for the .mp3 it created
         title = info.get("title", "audio")
-        mp3_path = self._find_mp3(output_dir, title)
+        audio_path = self._find_audio(output_dir, self.codec)
 
-        if mp3_path is None:
+        if audio_path is None:
             raise FileNotFoundError(
-                f"Download appeared to succeed but no .mp3 found in {output_dir}"
+                f"Download succeeded but no .{self.codec} found in {output_dir}"
             )
 
-        logger.info("Saved: %s (%s)", mp3_path, _human_size(mp3_path.stat().st_size))
-        return mp3_path
+        logger.info("Saved: %s (%s)", audio_path, _human_size(audio_path.stat().st_size))
+        return audio_path
 
     # ------------------------------------------------------------------
     # Combined convenience method
@@ -259,34 +264,34 @@ class SongScraper:
         Search for a song and download it in one call.
 
         Returns:
-            (metadata_dict, path_to_mp3)
+            (metadata_dict, path_to_audio)
         """
         metadata = self.search(query)
-        mp3_path = self.download(
+        audio_path = self.download(
             url=metadata["url"],
             output_dir=output_dir,
             progress_hook=progress_hook,
         )
-        return metadata, mp3_path
+        return metadata, audio_path
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _find_mp3(directory: Path, title_hint: str) -> Optional[Path]:
+    def _find_audio(directory: Path, codec: str) -> Optional[Path]:
         """
-        Find the .mp3 file that yt-dlp just created.
-
-        Strategy:
-          1. Look for newest .mp3 in the directory (most reliable).
-          2. Fall back to partial title match.
+        Find the most recently created audio file matching the codec extension.
+        Opus files may also arrive as .ogg; try both.
         """
-        mp3_files = list(directory.glob("*.mp3"))
-        if not mp3_files:
-            return None
-        # Return the most recently modified .mp3
-        return max(mp3_files, key=lambda p: p.stat().st_mtime)
+        extensions = [codec]
+        if codec == "opus":
+            extensions.append("ogg")  # yt-dlp sometimes outputs .ogg for opus
+        for ext in extensions:
+            files = list(directory.glob(f"*.{ext}"))
+            if files:
+                return max(files, key=lambda p: p.stat().st_mtime)
+        return None
 
 
 def _human_size(nbytes: int) -> str:
