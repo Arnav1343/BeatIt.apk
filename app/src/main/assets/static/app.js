@@ -23,6 +23,9 @@
     const themes = ['default', 'charcoal', 'neon', 'purple', 'deeppurple'];
     let themeIdx = 0;
 
+    /* ── vibration helper ── */
+    function vib(ms) { if (navigator.vibrate) navigator.vibrate(ms || 15); }
+
     /* ── tick sound (Web Audio API) ── */
     let audioCtx = null;
     function playTick() {
@@ -187,23 +190,25 @@
     }
 
     menuItems.forEach((el, i) => {
-        el.addEventListener('click', () => { menuIndex = i; updateMenuSelection(); menuSelect(); });
+        el.addEventListener('click', () => { vib(20); menuIndex = i; updateMenuSelection(); menuSelect(); });
     });
 
-    /* ── buttons ── */
+    /* ── buttons (all with vibration) ── */
     $('btnMenu').addEventListener('click', () => {
+        vib(20);
         if (currentView !== 'menu') showView('menu');
     });
 
     $('btnSelect').addEventListener('click', () => {
+        vib(25);
         if (currentView === 'menu') menuSelect();
         else if (currentView === 'library') playSelected();
         else if (currentView === 'nowplaying') togglePlay();
     });
 
-    $('btnPlay').addEventListener('click', togglePlay);
-    $('btnPrev').addEventListener('click', prevTrack);
-    $('btnNext').addEventListener('click', nextTrack);
+    $('btnPlay').addEventListener('click', () => { vib(20); togglePlay(); });
+    $('btnPrev').addEventListener('click', () => { vib(15); prevTrack(); });
+    $('btnNext').addEventListener('click', () => { vib(15); nextTrack(); });
 
     /* ────────── SEARCH ────────── */
     let searchDebounce = null;
@@ -354,7 +359,7 @@
     updateQualityOptions();
 
     /* ── download ── */
-    $('downloadBtn').addEventListener('click', startDownload);
+    $('downloadBtn').addEventListener('click', () => { vib(30); startDownload(); });
 
     async function startDownload() {
         if (!selectedResult) return;
@@ -565,12 +570,14 @@
 
     // Shuffle / Repeat
     $('btnShuffle').addEventListener('click', () => {
+        vib(15);
         shuffleOn = !shuffleOn;
         $('btnShuffle').classList.toggle('active', shuffleOn);
         showToast(shuffleOn ? 'Shuffle ON' : 'Shuffle OFF');
     });
 
     $('btnRepeat').addEventListener('click', () => {
+        vib(15);
         repeatOn = !repeatOn;
         $('btnRepeat').classList.toggle('active', repeatOn);
         showToast(repeatOn ? 'Repeat ON' : 'Repeat OFF');
