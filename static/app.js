@@ -95,7 +95,19 @@
         currentView = name;
         Object.entries(views).forEach(([k, el]) => el.classList.toggle('active', k === name));
         if (name === 'library') refreshLibrary();
-        if (name === 'search') searchInput.focus();
+        if (name === 'search') {
+            searchInput.focus();
+            // Restore active download progress UI if download is still running
+            if (activeDownloadTaskId) {
+                downloadProgressWrap.classList.remove('hidden');
+                downloadBtn.disabled = true;
+                downloadStatus.textContent = 'Downloading...';
+                if (activeDownloadTitle) {
+                    resultTitle.textContent = activeDownloadTitle;
+                    searchResult.classList.remove('hidden');
+                }
+            }
+        }
         if (name === 'nowplaying') updateNowPlaying();
     }
 
@@ -296,6 +308,10 @@
     // Initial render with MP3 defaults
     renderQualityOptions();
 
+    // ─── Download state (persists across view switches) ───
+    let activeDownloadTaskId = null;
+    let activeDownloadTitle = null;
+
     async function doDownload() {
         if (!lastSearchResult) return;
         downloadBtn.disabled = true; downloadStatus.textContent = 'Starting...'; downloadStatus.className = 'download-status';
@@ -305,6 +321,8 @@
             const r = await fetch('/api/download', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
             const d = await r.json();
             if (d.error) { downloadStatus.textContent = d.error; downloadStatus.className = 'download-status error'; downloadProgressWrap.classList.add('hidden'); downloadBtn.disabled = false; return; }
+            activeDownloadTaskId = d.task_id;
+            activeDownloadTitle = lastSearchResult.title;
             pollProgress(d.task_id);
         } catch { downloadStatus.textContent = 'Failed'; downloadStatus.className = 'download-status error'; downloadProgressWrap.classList.add('hidden'); downloadBtn.disabled = false; }
     }
@@ -314,16 +332,25 @@
         progressPollInterval = setInterval(async () => {
             try {
                 const r = await fetch('/api/progress/' + id); const d = await r.json();
-                if (d.status === 'downloading') { downloadProgressFill.style.width = d.percent + '%'; downloadProgressText.textContent = d.percent + '%'; downloadStatus.textContent = 'Downloading...'; }
-                else if (d.status === 'converting') { downloadProgressFill.style.width = '100%'; downloadProgressText.textContent = '100%'; downloadStatus.textContent = 'Converting...'; }
+                // Always update internal state even if not on search view
+                const onSearch = currentView === 'search';
+                if (d.status === 'downloading') {
+                    if (onSearch) { downloadProgressWrap.classList.remove('hidden'); downloadProgressFill.style.width = d.percent + '%'; downloadProgressText.textContent = d.percent + '%'; downloadStatus.textContent = 'Downloading...'; }
+                }
+                else if (d.status === 'converting') {
+                    if (onSearch) { downloadProgressFill.style.width = '100%'; downloadProgressText.textContent = '100%'; downloadStatus.textContent = 'Converting...'; }
+                }
                 else if (d.status === 'done' && d.result) {
-                    clearInterval(progressPollInterval); downloadProgressFill.style.width = '100%'; downloadProgressText.textContent = '✓';
-                    downloadStatus.textContent = '✓ Saved (' + d.result.size_human + ')'; downloadStatus.className = 'download-status success';
-                    downloadBtn.disabled = false; showToast('Downloaded!', 'success');
-                    await refreshLibrary(); playSong(d.result.filename, d.result.title);
+                    clearInterval(progressPollInterval); progressPollInterval = null;
+                    activeDownloadTaskId = null;
+                    if (onSearch) { downloadProgressFill.style.width = '100%'; downloadProgressText.textContent = '✓'; downloadStatus.textContent = '✓ Saved (' + d.result.size_human + ')'; downloadStatus.className = 'download-status success'; downloadBtn.disabled = false; }
+                    showToast('Downloaded!', 'success');
+                    await refreshLibrary();
                 } else if (d.status === 'error') {
-                    clearInterval(progressPollInterval); downloadStatus.textContent = d.error || 'Failed'; downloadStatus.className = 'download-status error';
-                    downloadProgressWrap.classList.add('hidden'); downloadBtn.disabled = false; showToast('Failed', 'error');
+                    clearInterval(progressPollInterval); progressPollInterval = null;
+                    activeDownloadTaskId = null;
+                    if (onSearch) { downloadStatus.textContent = d.error || 'Failed'; downloadStatus.className = 'download-status error'; downloadProgressWrap.classList.add('hidden'); downloadBtn.disabled = false; }
+                    showToast('Download failed', 'error');
                 }
             } catch { }
         }, 800);
@@ -431,9 +458,9 @@
 
     $('#btnMenu')?.addEventListener('click', goBack);
     $('#btnPlay')?.addEventListener('click', togglePlay);
-    $('#btnNext')?.addEventListener('click', () => { if (currentView === 'nowplaying') nextTrack(); });
-    $('#btnPrev')?.addEventListener('click', () => { if (currentView === 'nowplaying') prevTrack(); });
-    $('#btnSelect')?.addEventListener('click', () => { if (currentView === 'menu') menuSelect(); else if (currentView === 'library') libSelect(); });
+    $('#btnNext')?.addEventListener('click', nextTrack);
+    $('#btnPrev')?.addEventListener('click', prevTrack);
+    $('#btnSelect')?.addEventListener('click', () => { if (currentView === 'menu') menuSelect(); else if (currentView === 'library') libSelect(); else if (currentView === 'nowplaying') togglePlay(); });
 
     const wheel = $('#clickWheel');
     wheel?.addEventListener('wheel', e => { e.preventDefault(); handleScroll(e.deltaY > 0 ? 1 : -1); }, { passive: false });
@@ -450,7 +477,13 @@
     function handleScroll(dir) {
         if (currentView === 'menu') { dir > 0 ? menuDown() : menuUp(); }
         else if (currentView === 'library') { dir > 0 ? libDown() : libUp(); }
-        else if (currentView === 'nowplaying') { audio.volume = Math.max(0, Math.min(1, audio.volume + dir * -0.05)); showToast('Vol: ' + Math.round(audio.volume * 100) + '%'); }
+        else if (currentView === 'nowplaying') {
+            // Dial rotation seeks playback: clockwise (dir>0) = forward, counter-clockwise = backward
+            if (audio.duration) {
+                audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + dir * 5));
+                showToast(fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
+            }
+        }
     }
 
     document.addEventListener('keydown', e => {
