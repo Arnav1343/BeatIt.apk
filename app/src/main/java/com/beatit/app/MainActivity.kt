@@ -1,29 +1,35 @@
 package com.beatit.app
 
-import android.content.Intent
 import android.os.Bundle
 import android.webkit.*
-import androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+    private var server: BeatItServer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Start the local HTTP server as a foreground service
-        val serviceIntent = Intent(this, MusicServerService::class.java)
-        startForegroundService(serviceIntent)
+        // Start the local HTTP server on a background thread
+        Thread {
+            try {
+                server = BeatItServer(this, 8080)
+                server?.start()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
 
         webView = findViewById(R.id.webView)
         setupWebView()
 
-        // Wait briefly for server to start, then load
+        // Wait for server to start, then load
         webView.postDelayed({
             webView.loadUrl("http://localhost:8080")
-        }, 800)
+        }, 1200)
     }
 
     private fun setupWebView() {
@@ -41,9 +47,9 @@ class MainActivity : AppCompatActivity() {
             override fun onReceivedError(
                 view: WebView?, request: WebResourceRequest?, error: WebResourceError?
             ) {
-                if (error?.errorCode == ERROR_CONNECT) {
-                    // Server not ready yet — retry
-                    view?.postDelayed({ view.reload() }, 500)
+                // Server not ready yet — retry after a short delay
+                if (request?.isForMainFrame == true) {
+                    view?.postDelayed({ view.reload() }, 1000)
                 }
             }
         }
@@ -51,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         webView.webChromeClient = WebChromeClient()
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) {
             webView.goBack()
@@ -60,7 +67,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        try { server?.stop() } catch (_: Exception) {}
         super.onDestroy()
-        stopService(Intent(this, MusicServerService::class.java))
     }
 }
