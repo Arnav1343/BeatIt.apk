@@ -126,6 +126,10 @@
     }
 
     wheel.addEventListener('touchstart', e => {
+        // If touch is on a button (MENU, Play, Prev, Next, Select), let it through
+        const target = e.target.closest('button');
+        if (target) return; // don't intercept button taps
+
         const rect = wheel.getBoundingClientRect();
         if (!isOnRing(e, rect)) return;
         touchStartAngle = getAngle(e, rect);

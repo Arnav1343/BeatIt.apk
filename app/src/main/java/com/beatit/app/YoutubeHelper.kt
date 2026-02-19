@@ -13,6 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 class YoutubeHelper {
@@ -29,85 +30,48 @@ class YoutubeHelper {
         val streamUrl: String,
         val timestamp: Long = System.currentTimeMillis()
     ) {
-        fun isExpired(): Boolean =
-            System.currentTimeMillis() - timestamp > CACHE_TTL_MS
+        fun isExpired() = System.currentTimeMillis() - timestamp > CACHE_TTL_MS
+    }
+
+    // ── Extract best stream URL from StreamInfo ────────────────────
+    private fun extractBestUrl(info: StreamInfo): String? {
+        return info.audioStreams
+            ?.filter { it.content.isNotEmpty() }
+            ?.maxByOrNull { it.averageBitrate }
+            ?.content
+            ?: info.videoStreams
+                ?.filter { it.content.isNotEmpty() }
+                ?.firstOrNull()
+                ?.content
     }
 
     /**
-     * Search YouTube and return the best matching result.
-     */
-    fun search(query: String): Map<String, Any?>? {
-        return try {
-            val service = ServiceList.YouTube
-            val queryHandler = service.searchQHFactory.fromQuery(query)
-            val searchInfo = SearchInfo.getInfo(service, queryHandler)
-            val item = searchInfo.relatedItems
-                ?.filterIsInstance<StreamInfoItem>()
-                ?.firstOrNull() ?: return null
-
-            mapOf(
-                "url" to item.url,
-                "title" to item.name,
-                "uploader" to (item.uploaderName ?: ""),
-                "duration" to item.duration
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Return quick title suggestions for the search bar.
-     */
-    fun suggestions(query: String): List<Map<String, Any?>> {
-        return try {
-            val service = ServiceList.YouTube
-            val queryHandler = service.searchQHFactory.fromQuery(query)
-            val searchInfo = SearchInfo.getInfo(service, queryHandler)
-            searchInfo.relatedItems
-                ?.filterIsInstance<StreamInfoItem>()
-                ?.take(6)
-                ?.map { item ->
-                    mapOf(
-                        "url" to item.url,
-                        "title" to item.name,
-                        "uploader" to (item.uploaderName ?: ""),
-                        "duration" to item.duration
-                    )
-                } ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    /**
-     * Pre-fetch and cache the stream info for a video URL in the background.
-     * Call this when the user selects a suggestion — by the time they hit
-     * Download, the stream URL is already cached.
+     * Pre-fetch stream info in background. Stores a Future so getAudioStreamUrl()
+     * can await it instead of starting a duplicate extraction.
      */
     fun prefetchStreamInfo(videoUrl: String) {
-        prefetchExecutor.submit {
-            try {
-                if (streamCache.containsKey(videoUrl) && !streamCache[videoUrl]!!.isExpired()) {
-                    return@submit // already cached
-                }
-                val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
-                val url = info.audioStreams
-                    ?.filter { it.content.isNotEmpty() }
-                    ?.maxByOrNull { it.averageBitrate }
-                    ?.content
-                    ?: info.videoStreams
-                        ?.filter { it.content.isNotEmpty() }
-                        ?.firstOrNull()
-                        ?.content
+        // Already cached and valid
+        val cached = streamCache[videoUrl]
+        if (cached != null && !cached.isExpired()) return
 
+        // Already fetching — don't duplicate
+        if (pendingFetches.containsKey(videoUrl)) return
+
+        val future = prefetchExecutor.submit<String?> {
+            try {
+                val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
+                val url = extractBestUrl(info)
                 if (url != null) {
                     streamCache[videoUrl] = CachedStream(url)
                 }
+                url
             } catch (_: Exception) {
-                // prefetch failure is silent — download will retry
+                null
+            } finally {
+                pendingFetches.remove(videoUrl)
             }
         }
+        pendingFetches[videoUrl] = future
     }
 
     /**
@@ -119,42 +83,67 @@ class YoutubeHelper {
     }
 
     /**
-     * Get the best audio stream URL for a given YouTube video URL.
-     * Uses cache if available, otherwise fetches fresh.
+     * Get the best audio stream URL. Three-tier approach:
+     * 1. Cache hit → instant
+     * 2. Pending prefetch → await (no duplicate work)
+     * 3. Fresh extraction (last resort)
      */
     fun getAudioStreamUrl(videoUrl: String): Pair<String?, String?> {
-        // Check cache first
+        // 1. Cache hit — instant return
         val cached = streamCache[videoUrl]
         if (cached != null && !cached.isExpired()) {
             return Pair(cached.streamUrl, null)
         }
 
+        // 2. Await pending prefetch — avoid duplicate StreamInfo.getInfo()
+        val pending = pendingFetches[videoUrl]
+        if (pending != null) {
+            try {
+                val url = pending.get(30, TimeUnit.SECONDS)
+                if (url != null) return Pair(url, null)
+            } catch (_: Exception) {
+                // Prefetch failed — fall through to fresh extraction
+            }
+        }
+
+        // 3. Fresh extraction
         return try {
             val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
-
-            val audioUrl = info.audioStreams
-                ?.filter { it.content.isNotEmpty() }
-                ?.maxByOrNull { it.averageBitrate }
-                ?.content
-
-            if (audioUrl != null) {
-                streamCache[videoUrl] = CachedStream(audioUrl)
-                return Pair(audioUrl, null)
+            val url = extractBestUrl(info)
+            if (url != null) {
+                streamCache[videoUrl] = CachedStream(url)
+                Pair(url, null)
+            } else {
+                Pair(null, "No audio or video streams found for this video")
             }
-
-            val videoUrl2 = info.videoStreams
-                ?.filter { it.content.isNotEmpty() }
-                ?.firstOrNull()
-                ?.content
-
-            if (videoUrl2 != null) {
-                streamCache[videoUrl] = CachedStream(videoUrl2)
-                return Pair(videoUrl2, null)
-            }
-
-            Pair(null, "No audio or video streams found for this video")
         } catch (e: Exception) {
             Pair(null, e.message ?: "Unknown error extracting stream")
+        }
+    }
+
+    // ── Search ─────────────────────────────────────────────────────
+    fun search(query: String, limit: Int = 5): List<StreamInfoItem> {
+        return try {
+            val searchInfo = SearchInfo.getInfo(
+                ServiceList.YouTube,
+                ServiceList.YouTube.searchQHFactory.fromQuery(query)
+            )
+            searchInfo.relatedItems
+                .filterIsInstance<StreamInfoItem>()
+                .take(limit)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun suggestions(query: String): List<Map<String, Any?>> {
+        return search(query, 8).map { item ->
+            mapOf(
+                "title" to item.name,
+                "uploader" to (item.uploaderName ?: ""),
+                "duration" to item.duration,
+                "url" to item.url
+            )
         }
     }
 
@@ -162,6 +151,7 @@ class YoutubeHelper {
         private var isInitialized = false
         private const val CACHE_TTL_MS = 3600_000L // 1 hour
         private val streamCache = ConcurrentHashMap<String, CachedStream>()
+        private val pendingFetches = ConcurrentHashMap<String, Future<String?>>()
         private val prefetchExecutor = Executors.newSingleThreadExecutor()
     }
 }
