@@ -7,9 +7,10 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 data class TaskStatus(
-    val status: String,          // starting | downloading | done | error
+    val status: String,          // extracting | downloading | done | error
     val percent: Int = 0,
     val result: Map<String, Any>? = null,
     val error: String? = null
@@ -22,11 +23,17 @@ class DownloadManager(
     private val tasks = ConcurrentHashMap<String, TaskStatus>()
     private val executor = Executors.newCachedThreadPool()
     private val youtubeHelper = YoutubeHelper()
-    private val httpClient = OkHttpClient()
+
+    // Shared OkHttpClient with connection pooling
+    private val httpClient = OkHttpClient.Builder()
+        .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
 
     fun startDownload(videoUrl: String, title: String, quality: Int, codec: String): String {
         val taskId = UUID.randomUUID().toString()
-        tasks[taskId] = TaskStatus("starting")
+        tasks[taskId] = TaskStatus("extracting", 0)
 
         executor.submit {
             runDownload(taskId, videoUrl, title, quality, codec)
@@ -46,17 +53,15 @@ class DownloadManager(
 
     private fun runDownload(taskId: String, videoUrl: String, title: String, quality: Int, codec: String) {
         try {
-            // Step 1: Get audio stream URL from YouTube
-            tasks[taskId] = TaskStatus("downloading", 5)
+            // Step 1: Get audio stream URL (may be instant if pre-fetched)
+            tasks[taskId] = TaskStatus("extracting", 0)
             val (streamUrl, streamError) = youtubeHelper.getAudioStreamUrl(videoUrl)
             if (streamUrl == null) {
                 throw IOException(streamError ?: "Could not get audio stream URL")
             }
 
-            // Step 2: Download audio directly
-            // YouTube serves audio as opus/webm or m4a — we save it with the requested extension.
-            // The audio plays fine in Android WebView regardless of container mismatch.
-            tasks[taskId] = TaskStatus("downloading", 10)
+            // Step 2: Download audio with 64KB buffer
+            tasks[taskId] = TaskStatus("downloading", 5)
             val extension = if (codec == "opus") "opus" else "mp3"
             val outputFile = File(musicDir, "${sanitize(title)}.$extension")
             downloadWithProgress(streamUrl, outputFile, taskId)
@@ -85,14 +90,14 @@ class DownloadManager(
 
         dest.outputStream().use { out ->
             body.byteStream().use { input ->
-                val buffer = ByteArray(8192)
+                val buffer = ByteArray(65536) // 64KB buffer (was 8KB)
                 var downloaded = 0L
                 var read: Int
                 while (input.read(buffer).also { read = it } != -1) {
                     out.write(buffer, 0, read)
                     downloaded += read
                     if (contentLength > 0) {
-                        val pct = ((downloaded * 90) / contentLength).toInt().coerceIn(10, 95)
+                        val pct = ((downloaded * 95) / contentLength).toInt().coerceIn(5, 99)
                         tasks[taskId] = TaskStatus("downloading", pct)
                     }
                 }

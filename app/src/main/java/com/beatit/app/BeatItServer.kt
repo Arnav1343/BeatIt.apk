@@ -24,6 +24,7 @@ class BeatItServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 method == Method.POST && uri == "/api/search" -> handleSearch(session)
                 method == Method.POST && uri == "/api/suggestions" -> handleSuggestions(session)
                 method == Method.POST && uri == "/api/download" -> handleDownload(session)
+                method == Method.POST && uri == "/api/prefetch" -> handlePrefetch(session)
                 uri.startsWith("/api/progress/") -> handleProgress(uri)
                 uri == "/api/library" -> handleLibrary()
                 uri.startsWith("/api/music/") -> handleMusic(uri)
@@ -91,6 +92,13 @@ class BeatItServer(private val context: Context, port: Int) : NanoHTTPD(port) {
         val taskId = uri.removePrefix("/api/progress/")
         val status = downloadManager.getProgress(taskId) ?: return jsonError("Unknown task")
         return jsonOk(status)
+    }
+
+    private fun handlePrefetch(session: IHTTPSession): Response {
+        val body = readBody(session)
+        val url = gson.fromJson(body, Map::class.java)["url"] as? String ?: return jsonError("No URL")
+        youtubeHelper.prefetchStreamInfo(url)
+        return jsonOk(mapOf("prefetching" to true, "cached" to youtubeHelper.isPrefetched(url)))
     }
 
     // ── API: Library ────────────────────────────────────────────────

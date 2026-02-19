@@ -11,6 +11,8 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class YoutubeHelper {
@@ -20,6 +22,15 @@ class YoutubeHelper {
             NewPipe.init(OkHttpDownloader.getInstance())
             isInitialized = true
         }
+    }
+
+    // ── StreamInfo cache with 1-hour TTL ───────────────────────────
+    private data class CachedStream(
+        val streamUrl: String,
+        val timestamp: Long = System.currentTimeMillis()
+    ) {
+        fun isExpired(): Boolean =
+            System.currentTimeMillis() - timestamp > CACHE_TTL_MS
     }
 
     /**
@@ -70,29 +81,76 @@ class YoutubeHelper {
     }
 
     /**
+     * Pre-fetch and cache the stream info for a video URL in the background.
+     * Call this when the user selects a suggestion — by the time they hit
+     * Download, the stream URL is already cached.
+     */
+    fun prefetchStreamInfo(videoUrl: String) {
+        prefetchExecutor.submit {
+            try {
+                if (streamCache.containsKey(videoUrl) && !streamCache[videoUrl]!!.isExpired()) {
+                    return@submit // already cached
+                }
+                val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
+                val url = info.audioStreams
+                    ?.filter { it.content.isNotEmpty() }
+                    ?.maxByOrNull { it.averageBitrate }
+                    ?.content
+                    ?: info.videoStreams
+                        ?.filter { it.content.isNotEmpty() }
+                        ?.firstOrNull()
+                        ?.content
+
+                if (url != null) {
+                    streamCache[videoUrl] = CachedStream(url)
+                }
+            } catch (_: Exception) {
+                // prefetch failure is silent — download will retry
+            }
+        }
+    }
+
+    /**
+     * Check if a stream URL is already cached and ready.
+     */
+    fun isPrefetched(videoUrl: String): Boolean {
+        val cached = streamCache[videoUrl] ?: return false
+        return !cached.isExpired()
+    }
+
+    /**
      * Get the best audio stream URL for a given YouTube video URL.
-     * Falls back to video streams if no audio-only streams exist.
-     * Returns Pair(url, errorMsg) — url is null on failure.
+     * Uses cache if available, otherwise fetches fresh.
      */
     fun getAudioStreamUrl(videoUrl: String): Pair<String?, String?> {
+        // Check cache first
+        val cached = streamCache[videoUrl]
+        if (cached != null && !cached.isExpired()) {
+            return Pair(cached.streamUrl, null)
+        }
+
         return try {
             val info = StreamInfo.getInfo(ServiceList.YouTube, videoUrl)
 
-            // Try audio-only streams first (best quality)
             val audioUrl = info.audioStreams
-                ?.filter { it.content != null && it.content.isNotEmpty() }
+                ?.filter { it.content.isNotEmpty() }
                 ?.maxByOrNull { it.averageBitrate }
                 ?.content
 
-            if (audioUrl != null) return Pair(audioUrl, null)
+            if (audioUrl != null) {
+                streamCache[videoUrl] = CachedStream(audioUrl)
+                return Pair(audioUrl, null)
+            }
 
-            // Fallback: try video streams (they contain audio too)
             val videoUrl2 = info.videoStreams
-                ?.filter { it.content != null && it.content.isNotEmpty() }
+                ?.filter { it.content.isNotEmpty() }
                 ?.firstOrNull()
                 ?.content
 
-            if (videoUrl2 != null) return Pair(videoUrl2, null)
+            if (videoUrl2 != null) {
+                streamCache[videoUrl] = CachedStream(videoUrl2)
+                return Pair(videoUrl2, null)
+            }
 
             Pair(null, "No audio or video streams found for this video")
         } catch (e: Exception) {
@@ -102,12 +160,14 @@ class YoutubeHelper {
 
     companion object {
         private var isInitialized = false
+        private const val CACHE_TTL_MS = 3600_000L // 1 hour
+        private val streamCache = ConcurrentHashMap<String, CachedStream>()
+        private val prefetchExecutor = Executors.newSingleThreadExecutor()
     }
 }
 
 /**
  * OkHttp-based downloader for NewPipe Extractor.
- * Uses OkHttp 4.x property-access syntax.
  */
 class OkHttpDownloader private constructor() : Downloader() {
 
