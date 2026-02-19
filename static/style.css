@@ -191,8 +191,118 @@
   --danger: #ff6b6b;
 }
 
+/* ═══ LIGHT THEMES ═══ */
 
+/* Light — Clean White + Blue */
+[data-theme="light"] {
+  --bg: #F5F5F7;
+  --device-bg: #FFFFFF;
+  --device-border: #D2D2D7;
+  --device-shadow: rgba(0, 122, 255, 0.08);
+  --screen-bg: #FAFAFA;
+  --screen-shadow: rgba(0, 0, 0, 0.05);
+  --header-color: #007AFF;
+  --text-primary: #1D1D1F;
+  --text-secondary: #007AFF;
+  --text-muted: #86868B;
+  --artwork-bg: #E8E8ED;
+  --icon-color: #007AFF;
+  --transport-icon: #007AFF;
+  --bar-bg: #E5E5EA;
+  --wheel-bg: radial-gradient(circle at center, #E8E8ED 0%, #D2D2D7 100%);
+  --wheel-shadow-outer: rgba(0, 0, 0, 0.06);
+  --wheel-inner: rgba(0, 122, 255, 0.06);
+  --center-bg: radial-gradient(circle at 40% 35%, #F0F0F5, #E0E0E5);
+  --center-shadow: rgba(0, 0, 0, 0.08);
+  --center-inner: rgba(0, 122, 255, 0.08);
+  --wheel-label-color: #555;
+  --divider: rgba(0, 0, 0, 0.08);
+  --input-bg: #FFFFFF;
+  --input-border: #D2D2D7;
+  --card-bg: rgba(0, 122, 255, 0.04);
+  --card-border: rgba(0, 0, 0, 0.06);
+  --badge-text: #fff;
+  --toggle-bg: rgba(0, 122, 255, 0.08);
+  --toggle-color: #007AFF;
+  --accent: #007AFF;
+  --accent-fill: linear-gradient(90deg, #007AFF, #5AC8FA);
+  --success: #34C759;
+  --danger: #FF3B30;
+}
 
+/* Light Rose — Warm Cream + Rose */
+[data-theme="light-rose"] {
+  --bg: #FFF5F5;
+  --device-bg: #FFFFFF;
+  --device-border: #F0D4D4;
+  --device-shadow: rgba(220, 80, 100, 0.08);
+  --screen-bg: #FFFAFA;
+  --screen-shadow: rgba(0, 0, 0, 0.04);
+  --header-color: #DC5064;
+  --text-primary: #2D1A1A;
+  --text-secondary: #DC5064;
+  --text-muted: #B08888;
+  --artwork-bg: #FFE8E8;
+  --icon-color: #DC5064;
+  --transport-icon: #DC5064;
+  --bar-bg: #FFE0E0;
+  --wheel-bg: radial-gradient(circle at center, #FFE8E8 0%, #F0D4D4 100%);
+  --wheel-shadow-outer: rgba(0, 0, 0, 0.05);
+  --wheel-inner: rgba(220, 80, 100, 0.06);
+  --center-bg: radial-gradient(circle at 40% 35%, #FFF0F0, #FFE0E0);
+  --center-shadow: rgba(0, 0, 0, 0.06);
+  --center-inner: rgba(220, 80, 100, 0.08);
+  --wheel-label-color: #885555;
+  --divider: rgba(220, 80, 100, 0.12);
+  --input-bg: #FFFFFF;
+  --input-border: #F0D4D4;
+  --card-bg: rgba(220, 80, 100, 0.04);
+  --card-border: rgba(220, 80, 100, 0.08);
+  --badge-text: #fff;
+  --toggle-bg: rgba(220, 80, 100, 0.08);
+  --toggle-color: #DC5064;
+  --accent: #DC5064;
+  --accent-fill: linear-gradient(90deg, #DC5064, #F0889A);
+  --success: #34C759;
+  --danger: #FF3B30;
+}
+
+/* Light Mint — Soft Mint + Teal */
+[data-theme="light-mint"] {
+  --bg: #F0FAF6;
+  --device-bg: #FFFFFF;
+  --device-border: #C8E6DC;
+  --device-shadow: rgba(0, 168, 120, 0.08);
+  --screen-bg: #F5FDF9;
+  --screen-shadow: rgba(0, 0, 0, 0.04);
+  --header-color: #00A878;
+  --text-primary: #1A2D26;
+  --text-secondary: #00A878;
+  --text-muted: #7AAA96;
+  --artwork-bg: #E0F5EC;
+  --icon-color: #00A878;
+  --transport-icon: #00A878;
+  --bar-bg: #D8F0E4;
+  --wheel-bg: radial-gradient(circle at center, #E0F5EC 0%, #C8E6DC 100%);
+  --wheel-shadow-outer: rgba(0, 0, 0, 0.05);
+  --wheel-inner: rgba(0, 168, 120, 0.06);
+  --center-bg: radial-gradient(circle at 40% 35%, #EAF8F0, #D8F0E4);
+  --center-shadow: rgba(0, 0, 0, 0.06);
+  --center-inner: rgba(0, 168, 120, 0.08);
+  --wheel-label-color: #557766;
+  --divider: rgba(0, 168, 120, 0.1);
+  --input-bg: #FFFFFF;
+  --input-border: #C8E6DC;
+  --card-bg: rgba(0, 168, 120, 0.04);
+  --card-border: rgba(0, 168, 120, 0.08);
+  --badge-text: #fff;
+  --toggle-bg: rgba(0, 168, 120, 0.08);
+  --toggle-color: #00A878;
+  --accent: #00A878;
+  --accent-fill: linear-gradient(90deg, #00A878, #4DD9A8);
+  --success: #00A878;
+  --danger: #FF3B30;
+}
 
 
 

@@ -50,6 +50,9 @@
         { id: 'neon', name: 'Neon Green / Jet Black', dark: true },
         { id: 'purple', name: 'Purple / Black', dark: true },
         { id: 'deeppurple', name: 'Deep Purple / Rose Gold', dark: true },
+        { id: 'light', name: 'Light', dark: false },
+        { id: 'light-rose', name: 'Rose Light', dark: false },
+        { id: 'light-mint', name: 'Mint Light', dark: false },
     ];
     let currentThemeIndex = 0;
     const savedTheme = localStorage.getItem('ipod-theme-id');
