@@ -130,45 +130,24 @@ class YoutubeHelper {
     // ── Search ─────────────────────────────────────────────────────
     fun search(query: String, limit: Int = 5): List<StreamInfoItem> {
         return try {
-            // Try YouTube Music songs filter first (returns only actual songs)
-            val musicResults = try {
-                val searchInfo = SearchInfo.getInfo(
-                    ServiceList.YouTube,
-                    ServiceList.YouTube.searchQHFactory.fromQuery(
-                        query,
-                        listOf("music_songs"),
-                        ""
-                    )
-                )
-                searchInfo.relatedItems
-                    .filterIsInstance<StreamInfoItem>()
-                    .take(limit)
-            } catch (_: Exception) {
-                emptyList()
-            }
-
-            if (musicResults.isNotEmpty()) {
-                musicResults
-            } else {
-                // Fallback: regular search with " song" appended + filtering
-                val musicQuery = "$query song"
-                val searchInfo = SearchInfo.getInfo(
-                    ServiceList.YouTube,
-                    ServiceList.YouTube.searchQHFactory.fromQuery(musicQuery)
-                )
-                searchInfo.relatedItems
-                    .filterIsInstance<StreamInfoItem>()
-                    .filter { item ->
-                        val dur = item.duration
-                        val title = item.name ?: ""
-                        val url = item.url ?: ""
-                        if (url.contains("/shorts/")) return@filter false
-                        val goodDuration = dur in 60..600
-                        val notRejected = !REJECT_PATTERN.containsMatchIn(title)
-                        goodDuration && notRejected
-                    }
-                    .take(limit)
-            }
+            val musicQuery = "$query song"
+            val searchInfo = SearchInfo.getInfo(
+                ServiceList.YouTube,
+                ServiceList.YouTube.searchQHFactory.fromQuery(musicQuery)
+            )
+            searchInfo.relatedItems
+                .filterIsInstance<StreamInfoItem>()
+                .filter { item ->
+                    // Primary filter: NewPipe's built-in shorts detection
+                    if (item.isShortFormContent) return@filter false
+                    // Duration filter: skip very short (<60s) or very long (>10min)
+                    val dur = item.duration
+                    if (dur > 0 && (dur < 60 || dur > 600)) return@filter false
+                    // Keyword filter: skip non-music content
+                    val title = item.name ?: ""
+                    !REJECT_PATTERN.containsMatchIn(title)
+                }
+                .take(limit)
         } catch (e: Exception) {
             emptyList()
         }
