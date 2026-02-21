@@ -121,15 +121,31 @@ class YoutubeHelper {
         }
     }
 
+    // ── Reject pattern for non-music content ─────────────────────
+    private val REJECT_PATTERN = Regex(
+        """(#shorts|shorts|cricket|wicket|ipl|match|highlights|reaction|gameplay|tutorial|podcast|vlog|unboxing|review|trailer|teaser|behind.the.scenes|interview|news|cooking|recipe|workout|fitness|compilation|prank|challenge|stream|full\s*album|full\s*movie)""",
+        RegexOption.IGNORE_CASE
+    )
+
     // ── Search ─────────────────────────────────────────────────────
     fun search(query: String, limit: Int = 5): List<StreamInfoItem> {
         return try {
+            val musicQuery = "$query song"
             val searchInfo = SearchInfo.getInfo(
                 ServiceList.YouTube,
-                ServiceList.YouTube.searchQHFactory.fromQuery(query)
+                ServiceList.YouTube.searchQHFactory.fromQuery(musicQuery)
             )
             searchInfo.relatedItems
                 .filterIsInstance<StreamInfoItem>()
+                .filter { item ->
+                    val dur = item.duration
+                    val title = item.name ?: ""
+                    // Skip shorts (<60s) and very long videos (>10min)
+                    val goodDuration = dur <= 0 || (dur in 60..600)
+                    // Skip non-music content
+                    val notRejected = !REJECT_PATTERN.containsMatchIn(title)
+                    goodDuration && notRejected
+                }
                 .take(limit)
         } catch (e: Exception) {
             emptyList()
