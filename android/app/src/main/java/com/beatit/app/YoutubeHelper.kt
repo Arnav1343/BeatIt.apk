@@ -140,8 +140,12 @@ class YoutubeHelper {
                 .filter { item ->
                     val dur = item.duration
                     val title = item.name ?: ""
+                    val url = item.url ?: ""
+                    // Skip YouTube Shorts by URL pattern
+                    if (url.contains("/shorts/")) return@filter false
                     // Skip shorts (<60s) and very long videos (>10min)
-                    val goodDuration = dur <= 0 || (dur in 60..600)
+                    // Also skip unknown duration (0) — often shorts
+                    val goodDuration = dur in 60..600
                     // Skip non-music content
                     val notRejected = !REJECT_PATTERN.containsMatchIn(title)
                     goodDuration && notRejected
