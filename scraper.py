@@ -80,7 +80,7 @@ class SongScraper:
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
-            "default_search": f"ytsearch{self.SEARCH_COUNT}",
+            "default_search": f"ytmusicsearch{self.SEARCH_COUNT}",
             "noplaylist": True,
             "skip_download": True,
         }

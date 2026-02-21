@@ -74,7 +74,7 @@ def api_suggestions():
             "quiet": True,
             "no_warnings": True,
             "extract_flat": True,
-            "default_search": "ytsearch5",
+            "default_search": "ytmusicsearch5",
             "noplaylist": True,
             "skip_download": True,
         }
