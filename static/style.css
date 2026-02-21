@@ -391,7 +391,7 @@ body {
 /* Screen */
 .screen {
   width: 88%;
-  height: 300px;
+  height: 400px;
   border-radius: 20px;
   background: var(--screen-bg);
   overflow: hidden;
