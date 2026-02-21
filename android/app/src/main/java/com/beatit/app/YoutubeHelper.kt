@@ -138,11 +138,14 @@ class YoutubeHelper {
             searchInfo.relatedItems
                 .filterIsInstance<StreamInfoItem>()
                 .filter { item ->
-                    // Primary filter: NewPipe's built-in shorts detection
+                    // Filter shorts by URL (/shorts/)
+                    val url = item.url ?: ""
+                    if (url.contains("/shorts/")) return@filter false
+                    // Filter shorts by isShortFormContent (API detection)
                     if (item.isShortFormContent) return@filter false
-                    // Duration filter: skip very short (<60s) or very long (>10min)
+                    // Duration: skip very long (>15min) but allow short songs
                     val dur = item.duration
-                    if (dur > 0 && (dur < 60 || dur > 600)) return@filter false
+                    if (dur > 900) return@filter false
                     // Keyword filter: skip non-music content
                     val title = item.name ?: ""
                     !REJECT_PATTERN.containsMatchIn(title)
@@ -157,9 +160,10 @@ class YoutubeHelper {
         return search(query, 8).map { item ->
             mapOf(
                 "title" to item.name,
-                "uploader" to (item.uploaderName ?: ""),
+                "artist" to (item.uploaderName ?: ""),
                 "duration" to item.duration,
-                "url" to item.url
+                "url" to item.url,
+                "thumbnail" to (item.thumbnails.firstOrNull()?.url ?: "")
             )
         }
     }
