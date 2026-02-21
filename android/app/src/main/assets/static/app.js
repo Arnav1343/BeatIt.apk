@@ -1,5 +1,15 @@
 (() => {
     'use strict';
+
+    // Lock viewport height so keyboard doesn't shrink the layout
+    const setAppHeight = () => {
+        document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+    };
+    setAppHeight();
+    // Only update on orientation change, NOT on resize (keyboard triggers resize)
+    screen.orientation?.addEventListener('change', setAppHeight);
+
+
     const $ = s => document.querySelector(s);
     const $$ = s => [...document.querySelectorAll(s)];
 

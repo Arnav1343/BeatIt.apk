@@ -307,13 +307,15 @@
 
 
 body {
-  min-height: 100vh;
+  height: var(--app-height, 100vh);
+  min-height: var(--app-height, 100vh);
+  max-height: var(--app-height, 100vh);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg);
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-  overflow: auto;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   transition: background 0.4s ease
 }
@@ -322,9 +324,12 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  height: var(--app-height, 100vh);
+  min-height: var(--app-height, 100vh);
+  max-height: var(--app-height, 100vh);
   padding: 40px 20px;
-  position: relative
+  position: relative;
+  overflow: hidden
 }
 
 /* Theme controls */
