@@ -76,19 +76,20 @@ class SongScraper:
         Returns:
             dict with keys: id, title, url, duration, uploader, thumbnail
         """
+        search_query = query + " song"
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "extract_flat": False,
-            "default_search": f"ytmusicsearch{self.SEARCH_COUNT}",
+            "default_search": f"ytsearch{self.SEARCH_COUNT}",
             "noplaylist": True,
             "skip_download": True,
         }
 
-        logger.info("Searching YouTube for: %s", query)
+        logger.info("Searching YouTube for: %s", search_query)
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(search_query, download=False)
 
         entries = info.get("entries", [])
         if not entries:

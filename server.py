@@ -63,35 +63,55 @@ def api_search():
 
 @app.route("/api/suggestions", methods=["POST"])
 def api_suggestions():
-    """POST { query } -> list of suggestion dicts (quick top-5 results)"""
+    """POST { query } -> list of suggestion dicts (quick top-5 music results)"""
     data = request.get_json(force=True)
     query = data.get("query", "").strip()
     if not query:
         return jsonify([])
     try:
         import yt_dlp
+        import re
+        # Append "song" to bias results toward music
+        music_query = query + " song"
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
             "extract_flat": True,
-            "default_search": "ytmusicsearch5",
+            "default_search": "ytsearch15",
             "noplaylist": True,
             "skip_download": True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(music_query, download=False)
         entries = info.get("entries", []) or []
+
+        # Filter: only keep results that look like songs
+        REJECT = re.compile(
+            r"(#shorts|shorts|cricket|wicket|ipl|match|highlights|reaction|gameplay|tutorial|podcast|vlog|unboxing|review|trailer|teaser|behind.the.scenes|interview|news|cooking|recipe|workout|fitness)",
+            re.IGNORECASE,
+        )
         out = []
         for e in entries:
             if not e:
                 continue
+            dur = e.get("duration") or 0
+            title = e.get("title", "")
+            # Skip shorts (<60s), very long videos (>10 min), and reject keywords
+            if dur > 0 and dur < 60:
+                continue
+            if dur > 600:
+                continue
+            if REJECT.search(title):
+                continue
             out.append({
-                "title": e.get("title", ""),
+                "title": title,
                 "artist": e.get("uploader", ""),
-                "duration": e.get("duration", 0),
+                "duration": dur,
                 "url": e.get("url") or e.get("webpage_url") or f"https://www.youtube.com/watch?v={e.get('id','')}",
                 "thumbnail": e.get("thumbnail", ""),
             })
+            if len(out) >= 5:
+                break
         return jsonify(out)
     except Exception:
         return jsonify([])
