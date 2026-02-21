@@ -8,34 +8,41 @@
 
 /* Default: Pink + Black */
 :root {
-  --bg: #000000;
-  --device-bg: #0a0a0a;
-  --device-border: #1a1a1a;
-  --device-shadow: rgba(255, 46, 99, 0.2);
-  --screen-bg: #000000;
-  --screen-shadow: rgba(255, 46, 99, 0.15);
+  --bg: #0a0a0a;
+  --device-bg: linear-gradient(145deg, #141414, #0c0c0c);
+  --device-bg-flat: #111111;
+  --device-border: #2a2a2a;
+  --device-shadow: rgba(0, 0, 0, 0.6);
+  --device-edge-highlight: rgba(255, 255, 255, 0.06);
+  --screen-bg: #0a0a0a;
+  --screen-border: #333333;
+  --screen-shadow: rgba(0, 0, 0, 0.6);
+  --screen-glare: linear-gradient(165deg, rgba(255, 255, 255, 0.04) 0%, transparent 40%);
   --header-color: #FF2E63;
-  --text-primary: #ffffff;
+  --text-primary: #f0f0f0;
   --text-secondary: #FF2E63;
-  --text-muted: #883344;
-  --artwork-bg: #1a0008;
+  --text-muted: #775566;
+  --artwork-bg: #1a0a10;
   --icon-color: #FF2E63;
   --transport-icon: #FF2E63;
-  --bar-bg: #1a0008;
-  --wheel-bg: radial-gradient(circle at center, #1a0a0e 0%, #0a0005 100%);
-  --wheel-shadow-outer: rgba(255, 46, 99, 0.1);
-  --wheel-inner: rgba(255, 46, 99, 0.06);
-  --center-bg: radial-gradient(circle at 40% 35%, #1a0a0e, #0d0005);
-  --center-shadow: rgba(0, 0, 0, 0.4);
-  --center-inner: rgba(255, 46, 99, 0.08);
+  --bar-bg: #1a0a10;
+  --wheel-bg: radial-gradient(circle at center, #1c1015 0%, #100a0d 100%);
+  --wheel-shadow-outer: rgba(0, 0, 0, 0.5);
+  --wheel-inner: rgba(255, 46, 99, 0.04);
+  --wheel-depression: inset 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 -2px 6px rgba(255, 46, 99, 0.03);
+  --center-bg: radial-gradient(circle at 40% 35%, #201218, #140a0e);
+  --center-shadow: rgba(0, 0, 0, 0.6);
+  --center-inner: rgba(255, 46, 99, 0.06);
+  --center-raised: 0 3px 8px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
   --wheel-label-color: #FF2E63;
-  --divider: rgba(255, 46, 99, 0.12);
-  --input-bg: rgba(255, 46, 99, 0.08);
-  --input-border: rgba(255, 46, 99, 0.2);
-  --card-bg: rgba(255, 46, 99, 0.06);
-  --card-border: rgba(255, 46, 99, 0.12);
+  --wheel-separator: rgba(255, 46, 99, 0.08);
+  --divider: rgba(255, 46, 99, 0.1);
+  --input-bg: rgba(255, 46, 99, 0.06);
+  --input-border: rgba(255, 46, 99, 0.18);
+  --card-bg: rgba(255, 46, 99, 0.05);
+  --card-border: rgba(255, 46, 99, 0.1);
   --badge-text: #000;
-  --toggle-bg: rgba(255, 46, 99, 0.1);
+  --toggle-bg: rgba(255, 46, 99, 0.08);
   --toggle-color: #FF2E63;
   --accent: #FF2E63;
   --accent-fill: linear-gradient(90deg, #FF2E63, #ff6b8a);
@@ -370,36 +377,69 @@ body {
   transform: scale(0.95)
 }
 
-/* Device */
+/* Device — physical shell with edge highlights */
 .device {
   width: 340px;
   max-height: var(--app-height, 92vh);
   height: calc(var(--app-height, 100vh) - 40px);
-  border-radius: 40px;
-  background: var(--device-bg);
+  border-radius: 36px;
+  background: var(--device-bg, var(--device-bg-flat));
   border: 1.5px solid var(--device-border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 18px 20px 24px;
+  padding: 18px 20px 20px;
   position: relative;
   user-select: none;
-  box-shadow: 0 30px 60px var(--device-shadow);
+  box-shadow:
+    0 30px 60px var(--device-shadow),
+    inset 0 1px 0 var(--device-edge-highlight, rgba(255, 255, 255, 0.06)),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease
 }
 
-/* Screen */
+/* Top speaker slit illusion */
+.device::before {
+  content: '';
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(128, 128, 128, 0.15);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+/* Screen — inset into device, not floating */
 .screen {
-  width: 88%;
-  height: 45vh;
-  border-radius: 20px;
+  width: 90%;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 50vh;
+  border-radius: 8px;
   background: var(--screen-bg);
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
-  box-shadow: inset 0 1px 6px var(--screen-shadow);
-  transition: background 0.4s ease, box-shadow 0.4s ease
+  border: 2px solid var(--screen-border, rgba(0, 0, 0, 0.3));
+  box-shadow:
+    inset 0 2px 8px var(--screen-shadow),
+    inset 0 -1px 4px rgba(0, 0, 0, 0.15);
+  transition: background 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease
+}
+
+/* Screen glare overlay */
+.screen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--screen-glare, none);
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 6px;
 }
 
 /* Views */
@@ -481,14 +521,15 @@ body {
 }
 
 .np-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   line-height: 1.25;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-primary);
+  letter-spacing: -0.2px;
   transition: color 0.3s
 }
 
@@ -586,31 +627,50 @@ body {
 }
 
 .progress-time {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   transition: color 0.3s
 }
 
-/* Click Wheel */
+/* Click Wheel — 3-layer mechanical depth */
 .wheel {
-  width: 220px;
-  height: 220px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
   position: relative;
-  margin-top: auto;
-  margin-bottom: 20px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--wheel-bg);
-  box-shadow: inset 0 1px 0 var(--wheel-inner), 0 2px 6px var(--wheel-shadow-outer);
+  box-shadow:
+    var(--wheel-depression, inset 0 4px 12px rgba(0, 0, 0, 0.3)),
+    0 1px 0 var(--device-edge-highlight, rgba(255, 255, 255, 0.04)),
+    0 4px 12px var(--wheel-shadow-outer);
   transition: all 0.4s ease
 }
 
+/* Subtle ring where wheel meets device body */
+.wheel::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 50%;
+  border: 1px solid var(--wheel-separator, rgba(255, 255, 255, 0.04));
+  pointer-events: none;
+}
+
+/* Center select button — raised, pressable */
 .wheel-center {
-  width: 90px;
-  height: 90px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   cursor: pointer;
   border: none;
@@ -620,15 +680,21 @@ body {
   transform: translate(-50%, -50%);
   z-index: 3;
   background: var(--center-bg);
-  box-shadow: 0 1px 4px var(--center-shadow), inset 0 1px 0 var(--center-inner);
-  transition: all 0.3s ease;
+  box-shadow:
+    var(--center-raised, 0 3px 8px rgba(0, 0, 0, 0.4)),
+    inset 0 1px 0 var(--center-inner);
+  transition: all 0.15s ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation
 }
 
 .wheel-center:active {
-  transform: translate(-50%, -50%) scale(0.95);
-  transition: all 0.03s
+  transform: translate(-50%, -50%) scale(0.96);
+  box-shadow:
+    0 1px 3px var(--center-shadow, rgba(0, 0, 0, 0.4)),
+    inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  filter: brightness(0.9);
+  transition: all 0.04s
 }
 
 .wheel-label {
@@ -643,12 +709,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px;
+  padding: 8px;
   color: var(--wheel-label-color);
-  font-weight: 600;
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  font-family: inherit
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-family: inherit;
+  opacity: 0.85;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2)
 }
 
 .wheel-label-top {
@@ -1289,26 +1357,25 @@ body {
 @media(max-width:420px) {
   .device {
     width: 100vw;
-    height: 100vh;
+    height: var(--app-height, 100vh);
     border-radius: 0;
     border: none;
-    padding: 12px 14px 18px
+    padding: 10px 14px 14px
   }
 
   .screen {
-    height: 250px;
-    border-radius: 16px;
-    width: 90%
+    border-radius: 6px;
+    width: 92%
   }
 
   .wheel {
-    width: 200px;
-    height: 200px
+    width: 190px;
+    height: 190px
   }
 
   .wheel-center {
-    width: 80px;
-    height: 80px
+    width: 74px;
+    height: 74px
   }
 
   .theme-toggle {
