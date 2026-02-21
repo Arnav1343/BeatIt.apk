@@ -63,8 +63,16 @@ class BeatItServer(private val context: Context, port: Int) : NanoHTTPD(port) {
     private fun handleSearch(session: IHTTPSession): Response {
         val body = readBody(session)
         val query = gson.fromJson(body, Map::class.java)["query"] as? String ?: return jsonError("No query")
-        val result = youtubeHelper.search(query) ?: return jsonError("No results found")
-        return jsonOk(result)
+        val results = youtubeHelper.search(query)
+        if (results.isEmpty()) return jsonError("No results found")
+        val best = results.first()
+        return jsonOk(mapOf(
+            "title" to best.name,
+            "url" to best.url,
+            "duration" to best.duration,
+            "uploader" to (best.uploaderName ?: ""),
+            "thumbnail" to (best.thumbnails.firstOrNull()?.url ?: "")
+        ))
     }
 
     private fun handleSuggestions(session: IHTTPSession): Response {
