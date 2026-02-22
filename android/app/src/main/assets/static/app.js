@@ -81,13 +81,11 @@
         localStorage.setItem('ipod-theme-id', t.id);
     }
 
-    // Single theme cycle button
-    const themeCycleBtn = $('#themeCycle');
-    themeCycleBtn.addEventListener('click', () => {
+    function cycleTheme() {
         currentThemeIndex = (currentThemeIndex + 1) % themes.length;
         applyTheme();
         showToast(themes[currentThemeIndex].name);
-    });
+    }
 
     function showView(name, pushHistory = true) {
         if (pushHistory && currentView !== name) viewHistory.push(currentView);
@@ -127,7 +125,15 @@
     function updateMenuSel() { menuItems.forEach((el, i) => el.classList.toggle('selected', i === menuIndex)); }
     function menuUp() { menuIndex = Math.max(0, menuIndex - 1); updateMenuSel(); }
     function menuDown() { menuIndex = Math.min(menuItems.length - 1, menuIndex + 1); updateMenuSel(); }
-    function menuSelect() { const a = menuItems[menuIndex]?.dataset.action; if (a) showView(a); }
+    function menuSelect() {
+        const a = menuItems[menuIndex]?.dataset.action;
+        if (!a) return;
+        if (a === 'themes') {
+            cycleTheme();
+        } else {
+            showView(a);
+        }
+    }
 
     // ─── Suggestions ───────────────────────────────────────────────
     let suggestDebounce = null;
@@ -455,11 +461,19 @@
         audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
     });
 
-    $('#btnMenu')?.addEventListener('click', goBack);
-    $('#btnPlay')?.addEventListener('click', togglePlay);
-    $('#btnNext')?.addEventListener('click', nextTrack);
-    $('#btnPrev')?.addEventListener('click', prevTrack);
-    $('#btnSelect')?.addEventListener('click', () => { if (currentView === 'menu') menuSelect(); else if (currentView === 'library') libSelect(); else if (currentView === 'nowplaying') togglePlay(); });
+    const btnHaptic = () => { if (navigator.vibrate) navigator.vibrate(12); };
+    const selectHaptic = () => { if (navigator.vibrate) navigator.vibrate(15); };
+
+    $('#btnMenu')?.addEventListener('click', () => { btnHaptic(); goBack(); });
+    $('#btnPlay')?.addEventListener('click', () => { btnHaptic(); togglePlay(); });
+    $('#btnNext')?.addEventListener('click', () => { btnHaptic(); nextTrack(); });
+    $('#btnPrev')?.addEventListener('click', () => { btnHaptic(); prevTrack(); });
+    $('#btnSelect')?.addEventListener('click', () => {
+        selectHaptic();
+        if (currentView === 'menu') menuSelect();
+        else if (currentView === 'library') libSelect();
+        else if (currentView === 'nowplaying') togglePlay();
+    });
 
     const wheel = $('#clickWheel');
     wheel?.addEventListener('wheel', e => { e.preventDefault(); handleScroll(e.deltaY > 0 ? 1 : -1); }, { passive: false });

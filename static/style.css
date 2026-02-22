@@ -334,112 +334,88 @@ body {
   height: var(--app-height, 100vh);
   min-height: var(--app-height, 100vh);
   max-height: var(--app-height, 100vh);
-  padding: 40px 20px;
+  padding: 0;
   position: relative;
   overflow: hidden
 }
 
-/* Theme controls */
+/* Theme controls — hidden, theme cycling handled via menu */
 .theme-controls {
-  position: fixed;
-  top: 24px;
-  right: 24px;
-  display: flex;
-  gap: 8px;
-  z-index: 100;
+  display: none
 }
 
-.theme-toggle,
-.theme-cycle {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--toggle-bg);
-  border: 1px solid var(--divider);
-  color: var(--toggle-color);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(8px);
-  -webkit-tap-highlight-color: transparent
-}
-
-.theme-toggle:hover,
-.theme-cycle:hover {
-  transform: scale(1.1);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1)
-}
-
-.theme-toggle:active,
-.theme-cycle:active {
-  transform: scale(0.95)
-}
-
-/* Device — physical shell with edge highlights */
+/* Device — integrated physical shell */
 .device {
   width: 340px;
-  max-height: var(--app-height, 92vh);
-  height: calc(var(--app-height, 100vh) - 40px);
-  border-radius: 36px;
+  max-height: var(--app-height, 100vh);
+  height: var(--app-height, 100vh);
+  border-radius: 0;
   background: var(--device-bg, var(--device-bg-flat));
-  border: 1.5px solid var(--device-border);
+  border: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 18px 20px 20px;
+  padding: 14px 16px 12px;
   position: relative;
   user-select: none;
-  box-shadow:
-    0 30px 60px var(--device-shadow),
-    inset 0 1px 0 var(--device-edge-highlight, rgba(255, 255, 255, 0.06)),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease
+  box-shadow: none;
+  transition: background 0.4s ease
 }
 
-/* Top speaker slit illusion */
-.device::before {
-  content: '';
-  width: 40px;
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(128, 128, 128, 0.15);
-  margin-bottom: 10px;
-  flex-shrink: 0;
-}
-
-/* Screen — inset into device, not floating */
-.screen {
-  width: 90%;
-  flex: 1 1 0;
-  min-height: 0;
-  max-height: 50vh;
-  border-radius: 8px;
-  background: var(--screen-bg);
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border: 2px solid var(--screen-border, rgba(0, 0, 0, 0.3));
-  box-shadow:
-    inset 0 2px 8px var(--screen-shadow),
-    inset 0 -1px 4px rgba(0, 0, 0, 0.15);
-  transition: background 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease
-}
-
-/* Screen glare overlay */
-.screen::after {
+/* Noise texture overlay on device body */
+.device::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--screen-glare, none);
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Top speaker slit */
+.device::before {
+  content: '';
+  width: 36px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(128, 128, 128, 0.12);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+/* Screen — inset with subtle border */
+.screen {
+  width: 92%;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 55vh;
+  border-radius: 4px;
+  background: var(--screen-bg);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--screen-border, rgba(0, 0, 0, 0.2));
+  box-shadow: inset 0 1px 4px var(--screen-shadow);
+  transition: background 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+  z-index: 1;
+}
+
+/* Very faint screen glare */
+.screen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   pointer-events: none;
   z-index: 5;
-  border-radius: 6px;
 }
 
 /* Views */
@@ -449,7 +425,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 0 16px 10px;
+  padding: 0 12px 8px;
   display: none;
   flex-direction: column;
   overflow-y: auto;
@@ -463,7 +439,7 @@ body {
 #viewMenu,
 #viewSearch,
 #viewLibrary {
-  padding-top: 14px
+  padding-top: 8px
 }
 
 #viewNowPlaying {
@@ -484,22 +460,22 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 14px 16px 0;
+  gap: 6px;
+  padding: 10px 12px 0;
   flex: 1
 }
 
 .np-artwork {
-  width: 110px;
-  height: 110px;
-  border-radius: 12px;
+  width: 100px;
+  height: 100px;
+  border-radius: 4px;
   background: var(--artwork-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   transition: background 0.3s
 }
 
@@ -511,7 +487,7 @@ body {
 
 .np-artwork-placeholder {
   color: var(--text-muted);
-  opacity: 0.5
+  opacity: 0.7
 }
 
 .np-info {
@@ -521,36 +497,38 @@ body {
 }
 
 .np-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.25;
-  margin-bottom: 4px;
+  line-height: 1.3;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-primary);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
   transition: color 0.3s
 }
 
 .np-artist {
-  font-size: 13px;
-  margin-bottom: 4px;
+  font-size: 11px;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-secondary);
+  opacity: 0.8;
   transition: color 0.3s
 }
 
 .np-trackcount {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
+  opacity: 0.6;
   transition: color 0.3s
 }
 
 .np-transport {
-  padding: 0 16px 12px;
+  padding: 0 12px 8px;
   flex-shrink: 0
 }
 
@@ -586,10 +564,11 @@ body {
   padding: 0 2px
 }
 
+/* iPod-style thin flat progress bar */
 .progress-bar {
   width: 100%;
-  height: 8px;
-  border-radius: 8px;
+  height: 4px;
+  border-radius: 2px;
   position: relative;
   overflow: visible;
   cursor: pointer;
@@ -599,8 +578,8 @@ body {
 
 .progress-fill {
   height: 100%;
-  border-radius: 8px;
-  background: var(--accent-fill);
+  border-radius: 2px;
+  background: var(--accent);
   transition: width 0.3s linear
 }
 
@@ -609,11 +588,11 @@ body {
   top: 50%;
   left: 0%;
   transform: translate(-50%, -50%);
-  width: 14px;
-  height: 14px;
-  background: #fff;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
   border-radius: 50%;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
   pointer-events: none;
   z-index: 2;
   transition: left 0.3s linear
@@ -622,55 +601,58 @@ body {
 .progress-times {
   display: flex;
   justify-content: space-between;
-  margin-top: 6px;
-  padding: 0 2px
+  margin-top: 4px;
+  padding: 0
 }
 
 .progress-time {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   transition: color 0.3s
 }
 
-/* Click Wheel — 3-layer mechanical depth */
+/* Click Wheel — directional lighting, mechanical depth */
 .wheel {
-  width: 200px;
-  height: 200px;
+  width: 185px;
+  height: 185px;
   border-radius: 50%;
   position: relative;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--wheel-bg);
   box-shadow:
-    var(--wheel-depression, inset 0 4px 12px rgba(0, 0, 0, 0.3)),
-    0 1px 0 var(--device-edge-highlight, rgba(255, 255, 255, 0.04)),
-    0 4px 12px var(--wheel-shadow-outer);
-  transition: all 0.4s ease
+    var(--wheel-depression, inset 0 4px 12px rgba(0, 0, 0, 0.4)),
+    inset 2px 2px 6px rgba(255, 255, 255, 0.03),
+    inset -2px -2px 6px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.02),
+    0 2px 8px var(--wheel-shadow-outer);
+  transition: all 0.4s ease;
+  z-index: 1;
 }
 
-/* Subtle ring where wheel meets device body */
+/* Subtle recessed ring */
 .wheel::before {
   content: '';
   position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
   border-radius: 50%;
-  border: 1px solid var(--wheel-separator, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--wheel-separator, rgba(255, 255, 255, 0.03));
   pointer-events: none;
 }
 
 /* Center select button — raised, pressable */
 .wheel-center {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   cursor: pointer;
   border: none;
@@ -681,20 +663,22 @@ body {
   z-index: 3;
   background: var(--center-bg);
   box-shadow:
-    var(--center-raised, 0 3px 8px rgba(0, 0, 0, 0.4)),
-    inset 0 1px 0 var(--center-inner);
-  transition: all 0.15s ease;
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 var(--center-inner),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.1s ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation
 }
 
 .wheel-center:active {
-  transform: translate(-50%, -50%) scale(0.96);
+  transform: translate(-50%, -50%) scale(0.95);
   box-shadow:
-    0 1px 3px var(--center-shadow, rgba(0, 0, 0, 0.4)),
-    inset 0 2px 6px rgba(0, 0, 0, 0.3);
-  filter: brightness(0.9);
-  transition: all 0.04s
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 3px 8px rgba(0, 0, 0, 0.4);
+  filter: brightness(0.85);
+  transition: all 0.03s
 }
 
 .wheel-label {
@@ -705,22 +689,22 @@ body {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: all 0.08s;
+  transition: all 0.06s;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 6px;
   color: var(--wheel-label-color);
   font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 2px;
+  font-size: 9px;
+  letter-spacing: 2.5px;
   font-family: inherit;
-  opacity: 0.85;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2)
+  opacity: 0.75;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3)
 }
 
 .wheel-label-top {
-  top: 10px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%)
 }
@@ -730,7 +714,7 @@ body {
 }
 
 .wheel-label-bottom {
-  bottom: 10px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%)
 }
@@ -740,7 +724,7 @@ body {
 }
 
 .wheel-label-left {
-  left: 10px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%)
 }
@@ -750,7 +734,7 @@ body {
 }
 
 .wheel-label-right {
-  right: 10px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%)
 }
@@ -759,7 +743,7 @@ body {
   transform: translateY(-50%) scale(0.85)
 }
 
-/* Menu */
+/* Menu — iPod Classic full-width flat selection */
 .menu-list {
   display: flex;
   flex-direction: column
@@ -768,13 +752,13 @@ body {
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 10px;
-  border-radius: 10px;
-  font-size: 14px;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 0;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.1s;
+  transition: background 0.05s, color 0.05s;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   border-bottom: 1px solid var(--divider);
@@ -786,38 +770,40 @@ body {
 }
 
 .menu-item:active {
-  transform: scale(0.97)
+  opacity: 0.8
 }
 
+/* Full-width solid highlight, white text — classic iPod */
 .menu-item.selected {
-  background: var(--card-bg)
+  background: var(--accent);
+  color: #fff;
 }
 
 .menu-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: inherit;
   flex-shrink: 0;
-  opacity: 0.6
+  opacity: 0.5
 }
 
 .menu-item.selected .menu-icon {
   opacity: 1;
-  color: var(--accent)
+  color: #fff
 }
 
 .menu-item .menu-arrow {
   margin-left: auto;
-  font-size: 18px;
+  font-size: 16px;
   opacity: 0.2
 }
 
 .menu-item.selected .menu-arrow {
-  opacity: 0.5;
-  color: var(--accent)
+  opacity: 0.8;
+  color: #fff
 }
 
 .menu-badge {
