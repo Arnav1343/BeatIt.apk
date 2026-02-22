@@ -472,8 +472,30 @@
     }, { passive: false });
     wheel?.addEventListener('touchend', () => { lastAngle = null; });
 
+    // ─── Haptic + Click sound for dial ─────────────────────────────
+    let audioCtx = null;
+    function dialTick() {
+        // Haptic: short strong vibration
+        if (navigator.vibrate) navigator.vibrate(8);
+        // Click sound via Web Audio API
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 3000;
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.03);
+        } catch (_) { }
+    }
+
     function getAngle(x, y) { const r = wheel.getBoundingClientRect(); return Math.atan2(y - r.top - r.height / 2, x - r.left - r.width / 2) * (180 / Math.PI); }
     function handleScroll(dir) {
+        dialTick();
         if (currentView === 'menu') { dir > 0 ? menuDown() : menuUp(); }
         else if (currentView === 'library') { dir > 0 ? libDown() : libUp(); }
         else if (currentView === 'nowplaying') {
