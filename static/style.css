@@ -1470,7 +1470,160 @@ body {
   font-size: 11px;
 }
 
-.quality-opt .q-detail {
-  font-size: 9px;
+/* ─── Batch Import & Monitor ───────────────────────────────── */
+#viewImport .import-instructions {
+  font-size: 11px;
   color: var(--text-muted);
+  text-align: center;
+  margin: 10px 0 20px;
+  line-height: 1.4;
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-item {
+  padding: 10px;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.batch-item.selected {
+  background: var(--card-bg);
+}
+
+.batch-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.batch-item-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.batch-item-progress {
+  height: 2px;
+  background: var(--bar-bg);
+  margin-top: 6px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.batch-item-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.batch-detail-header {
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.batch-detail-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--header-color);
+}
+
+.batch-detail-stats {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.batch-track-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.track-item.selected {
+  background: var(--card-bg);
+}
+
+.track-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: var(--artwork-bg);
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-status-pill {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.status-matched {
+  background: rgba(0, 255, 136, 0.1);
+  color: #00FF88;
+}
+
+.status-downloading {
+  background: rgba(255, 46, 99, 0.1);
+  color: #FF2E63;
+}
+
+.status-completed {
+  background: rgba(0, 122, 255, 0.1);
+  color: #007AFF;
+}
+
+.status-failed {
+  background: rgba(255, 68, 68, 0.1);
+  color: #FF4444;
+}
+
+.status-low-confidence {
+  background: rgba(255, 167, 127, 0.1);
+  color: #FFA77F;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }

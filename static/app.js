@@ -6,14 +6,21 @@
         document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
     };
     setAppHeight();
-    // Only update on orientation change, NOT on resize (keyboard triggers resize)
     screen.orientation?.addEventListener('change', setAppHeight);
-
 
     const $ = s => document.querySelector(s);
     const $$ = s => [...document.querySelectorAll(s)];
 
-    const views = { menu: $('#viewMenu'), search: $('#viewSearch'), library: $('#viewLibrary'), nowplaying: $('#viewNowPlaying') };
+    const views = {
+        menu: $('#viewMenu'),
+        search: $('#viewSearch'),
+        library: $('#viewLibrary'),
+        nowplaying: $('#viewNowPlaying'),
+        import: $('#viewImport'),
+        batches: $('#viewBatches'),
+        batchDetail: $('#viewBatchDetail'),
+        actionMenu: $('#viewActionMenu')
+    };
     const audio = $('#audioPlayer');
     const searchInput = $('#searchInput');
     const suggestionsDropdown = $('#suggestionsDropdown');
@@ -53,6 +60,17 @@
     let isShuffle = false;
     let isRepeat = false;
 
+    // ─── Batch Import state ─────────────────────────────────────────
+    let batches = [];
+    let batchesIndex = 0;
+    let batchTracks = [];
+    let batchTracksIndex = 0;
+    let activeBatchId = null;
+    let activeTrackId = null;
+    let batchPollInterval = null;
+    let batchDetailPollInterval = null;
+    let actionMenuIndex = 0;
+
     // ─── Theme System ───────────────────────────────────────────────
     const themes = [
         { id: 'default', name: 'Pink / Black', dark: true },
@@ -73,11 +91,8 @@
 
     function applyTheme() {
         const t = themes[currentThemeIndex];
-        if (t.id === 'default') {
-            document.body.removeAttribute('data-theme');
-        } else {
-            document.body.setAttribute('data-theme', t.id);
-        }
+        if (t.id === 'default') document.body.removeAttribute('data-theme');
+        else document.body.setAttribute('data-theme', t.id);
         localStorage.setItem('ipod-theme-id', t.id);
     }
 
@@ -90,25 +105,42 @@
     function showView(name, pushHistory = true) {
         if (pushHistory && currentView !== name) viewHistory.push(currentView);
         currentView = name;
-        Object.entries(views).forEach(([k, el]) => el.classList.toggle('active', k === name));
+        Object.entries(views).forEach(([k, el]) => el?.classList.toggle('active', k === name));
+
+        if (batchPollInterval) { clearInterval(batchPollInterval); batchPollInterval = null; }
+        if (batchDetailPollInterval) { clearInterval(batchDetailPollInterval); batchDetailPollInterval = null; }
+
         if (name === 'library') refreshLibrary();
+        if (name === 'import') { $('#importInput').focus(); }
+        if (name === 'batches') { refreshBatches(); batchPollInterval = setInterval(refreshBatches, 2000); }
+        if (name === 'batchDetail') { refreshBatchDetail(); batchDetailPollInterval = setInterval(refreshBatchDetail, 1000); }
+
         if (name === 'search') {
             searchInput.focus();
-            // Restore active download progress UI if download is still running
             if (activeDownloadTaskId) {
                 downloadProgressWrap.classList.remove('hidden');
                 downloadBtn.disabled = true;
                 downloadStatus.textContent = 'Downloading...';
-                if (activeDownloadTitle) {
-                    resultTitle.textContent = activeDownloadTitle;
-                    searchResult.classList.remove('hidden');
-                }
+                if (activeDownloadTitle) { resultTitle.textContent = activeDownloadTitle; searchResult.classList.remove('hidden'); }
             }
         }
         if (name === 'nowplaying') updateNowPlaying();
+
+        // Reset indices
+        if (name === 'menu') menuIndex = 0;
+        if (name === 'actionMenu') actionMenuIndex = 0;
+        if (name === 'library') libraryIndex = 0;
+        if (name === 'batches') batchesIndex = 0;
+        if (name === 'batchDetail') batchTracksIndex = 0;
+
+        if (name !== 'search' && name !== 'actionMenu') {
+            activeTrackId = null;
+            downloadBtn.textContent = 'Download Audio';
+        }
+        updateAllMenuSels();
     }
 
-    function goBack() { if (viewHistory.length) showView(viewHistory.pop(), false); }
+    function goBack() { if (viewHistory.length) showView(viewHistory.pop(), false); else if (currentView !== 'menu') showView('menu'); }
     function showLoading(msg) { loadingText.textContent = msg || 'Loading...'; loadingOverlay.classList.remove('hidden'); }
     function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
@@ -121,18 +153,66 @@
         toastTimeout = setTimeout(() => { toastEl.classList.remove('visible'); setTimeout(() => toastEl.classList.add('hidden'), 250); }, dur || 2000);
     }
 
-    const menuItems = $$('#viewMenu .menu-item');
-    function updateMenuSel() { menuItems.forEach((el, i) => el.classList.toggle('selected', i === menuIndex)); }
-    function menuUp() { menuIndex = Math.max(0, menuIndex - 1); updateMenuSel(); }
-    function menuDown() { menuIndex = Math.min(menuItems.length - 1, menuIndex + 1); updateMenuSel(); }
-    function menuSelect() {
-        const a = menuItems[menuIndex]?.dataset.action;
-        if (!a) return;
-        if (a === 'themes') {
-            cycleTheme();
-        } else {
-            showView(a);
+    function updateAllMenuSels() {
+        $$('#viewMenu .menu-item').forEach((el, i) => el.classList.toggle('selected', i === menuIndex));
+        $$('#viewActionMenu .menu-item').forEach((el, i) => el.classList.toggle('selected', i === actionMenuIndex));
+    }
+
+    function menuUp() {
+        if (currentView === 'menu') menuIndex = Math.max(0, menuIndex - 1);
+        else if (currentView === 'actionMenu') actionMenuIndex = Math.max(0, actionMenuIndex - 1);
+        updateAllMenuSels();
+    }
+
+    function menuDown() {
+        if (currentView === 'menu') {
+            const items = $$('#viewMenu .menu-item');
+            menuIndex = Math.min(items.length - 1, menuIndex + 1);
+        } else if (currentView === 'actionMenu') {
+            const items = $$('#viewActionMenu .menu-item');
+            actionMenuIndex = Math.min(items.length - 1, actionMenuIndex + 1);
         }
+        updateAllMenuSels();
+    }
+
+    function menuSelect() {
+        const items = $$('#viewMenu .menu-item');
+        const a = items[menuIndex]?.dataset.action;
+        if (!a) return;
+        if (a === 'themes') cycleTheme();
+        else showView(a);
+    }
+
+    async function actionMenuSelect() {
+        const items = $$('#viewActionMenu .menu-item');
+        const action = items[actionMenuIndex]?.dataset.action;
+        if (!action || !activeTrackId) return;
+
+        if (action === 'manual') {
+            const track = batchTracks.find(t => t.id === activeTrackId);
+            if (track) searchInput.value = track.title;
+            downloadBtn.textContent = 'Pick for Import';
+            showView('search');
+            return;
+        }
+
+        showLoading('Applying action...');
+        try {
+            const r = await fetch('/api/import/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ track_id: activeTrackId, action })
+            });
+            const d = await r.json();
+            if (d.success) {
+                showToast('Action applied', 'success');
+                activeTrackId = null;
+                goBack();
+            } else {
+                showToast(d.error || 'Failed', 'error');
+            }
+        } catch { showToast('Network error', 'error'); }
+        finally { hideLoading(); }
     }
 
     // ─── Suggestions ───────────────────────────────────────────────
@@ -150,8 +230,8 @@
         suggestIndex = -1;
         if (!items.length) { suggestionsDropdown.classList.add('hidden'); return; }
         suggestionsDropdown.innerHTML = items.map((s, i) => {
-            const thumb = s.thumbnail ? `<img class="suggestion-thumb" src="${escapeAttr(s.thumbnail)}" alt="">` : `<div class="suggestion-thumb"></div>`;
-            return `<div class="suggestion-item" data-idx="${i}">${thumb}<div class="suggestion-info"><div class="suggestion-title">${escapeHtml(s.title)}</div><div class="suggestion-artist">${escapeHtml(s.artist || '')}</div></div><span class="suggestion-dur">${formatDuration(s.duration)}</span></div>`;
+            const thumb = s.thumbnail ? `<img class="suggestion-thumb" src="${esc(s.thumbnail)}" alt="">` : `<div class="suggestion-thumb"></div>`;
+            return `<div class="suggestion-item" data-idx="${i}">${thumb}<div class="suggestion-info"><div class="suggestion-title">${escH(s.title)}</div><div class="suggestion-artist">${escH(s.artist || '')}</div></div><span class="suggestion-dur">${formatDuration(s.duration)}</span></div>`;
         }).join('');
         suggestionsDropdown.classList.remove('hidden');
     }
@@ -167,7 +247,6 @@
         if (!item) return;
         hideSuggestions();
         searchInput.value = item.title;
-        // Set as the search result directly
         lastSearchResult = {
             id: '', title: item.title, url: item.url,
             duration: item.duration, uploader: item.artist,
@@ -201,9 +280,8 @@
         if (item) selectSuggestion(parseInt(item.dataset.idx));
     });
 
-    // Arrow keys in search input to navigate suggestions
     searchInput.addEventListener('keydown', (e) => {
-        if (!suggestionsData.length) return;
+        if (!suggestionsData.length) { if (e.key === 'Enter') doSearch(); return; }
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             suggestIndex = Math.min(suggestionsData.length - 1, suggestIndex + 1);
@@ -215,8 +293,7 @@
         } else if (e.key === 'Enter' && suggestIndex >= 0) {
             e.preventDefault();
             selectSuggestion(suggestIndex);
-            return;
-        }
+        } else if (e.key === 'Enter') { doSearch(); }
     });
 
     async function doSearch() {
@@ -232,17 +309,15 @@
             if (d.error) { searchStatus.textContent = d.error; searchStatus.className = 'search-status error-text'; showToast('Not found', 'error'); return; }
             lastSearchResult = d;
             resultTitle.textContent = d.title;
-            const dur = d.duration || 0;
-            resultMeta.textContent = (d.uploader || d.artist || '') + '  ·  ' + formatDuration(dur);
+            resultMeta.textContent = (d.uploader || d.artist || '') + '  ·  ' + formatDuration(d.duration || 0);
             searchResult.classList.remove('hidden');
             searchStatus.textContent = '✓ Found'; downloadBtn.disabled = false;
-            updateQualitySizes(d.duration || lastSearchResult.duration || 0);
+            updateQualitySizes(d.duration || 0);
         } catch {
             searchStatus.textContent = 'Search failed'; searchStatus.className = 'search-status error-text'; showToast('Failed', 'error');
         } finally { hideLoading(); }
     }
 
-    // ─── Format + Quality Selector ──────────────────────────────────
     const CODEC_OPTIONS = {
         mp3: [
             { q: 320, label: 'High', detail: '320 kbps' },
@@ -268,57 +343,68 @@
     function renderQualityOptions() {
         const opts = CODEC_OPTIONS[selectedCodec];
         const defOpt = opts.find(o => o.default) || opts[0];
-        selectedQuality = selectedQuality; // keep previous if valid, else use default
         const validQs = opts.map(o => o.q);
         if (!validQs.includes(selectedQuality)) selectedQuality = defOpt.q;
 
         const dur = lastSearchResult?.duration || 0;
         const container = $('#qualityOptions');
         container.innerHTML = opts.map(o => {
-            const sz = estimateSize(dur, o.q);
             const active = o.q === selectedQuality ? 'active' : '';
             return `<button class="quality-opt ${active}" data-quality="${o.q}">
                 <span class="q-name">${o.label}</span>
-                <span class="q-detail">${o.detail} · <span class="q-size">${sz}</span></span>
+                <span class="q-detail">${o.detail} · <span class="q-size">${estimateSize(dur, o.q)}</span></span>
             </button>`;
         }).join('');
 
-        $$('.quality-opt').forEach(btn => {
-            btn.addEventListener('click', () => {
-                $$('.quality-opt').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                selectedQuality = parseInt(btn.dataset.quality);
-            });
-        });
+        $$('.quality-opt').forEach(btn => btn.addEventListener('click', () => {
+            $$('.quality-opt').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedQuality = parseInt(btn.dataset.quality);
+        }));
     }
 
     function updateQualitySizes(duration) {
         $$('.quality-opt').forEach(btn => {
-            const kbps = parseInt(btn.dataset.quality);
             const sz = btn.querySelector('.q-size');
-            if (sz) sz.textContent = estimateSize(duration, kbps);
+            if (sz) sz.textContent = estimateSize(duration, parseInt(btn.dataset.quality));
         });
     }
 
-    // Format toggle (MP3 / Opus)
-    $$('.fmt-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            $$('.fmt-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedCodec = btn.dataset.codec;
-            renderQualityOptions();
-        });
-    });
+    $$('.fmt-btn').forEach(btn => btn.addEventListener('click', () => {
+        $$('.fmt-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedCodec = btn.dataset.codec;
+        renderQualityOptions();
+    }));
 
-    // Initial render with MP3 defaults
     renderQualityOptions();
 
-    // ─── Download state (persists across view switches) ───
     let activeDownloadTaskId = null;
     let activeDownloadTitle = null;
 
     async function doDownload() {
         if (!lastSearchResult) return;
+
+        if (activeTrackId) {
+            const videoId = lastSearchResult.url.includes('v=') ? lastSearchResult.url.split('v=')[1].split('&')[0] : null;
+            if (videoId) {
+                showLoading('Attaching...');
+                try {
+                    await fetch('/api/import/action', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ track_id: activeTrackId, action: 'accept', video_id: videoId })
+                    });
+                    activeTrackId = null;
+                    downloadBtn.textContent = 'Download Audio';
+                    showToast('Attached to batch', 'success');
+                    showView('batchDetail');
+                } catch { showToast('Failed to attach', 'error'); }
+                finally { hideLoading(); }
+                return;
+            }
+        }
+
         downloadBtn.disabled = true; downloadStatus.textContent = 'Starting...'; downloadStatus.className = 'download-status';
         downloadProgressWrap.classList.remove('hidden'); downloadProgressFill.style.width = '0%'; downloadProgressText.textContent = '0%';
         try {
@@ -337,7 +423,6 @@
         progressPollInterval = setInterval(async () => {
             try {
                 const r = await fetch('/api/progress/' + id); const d = await r.json();
-                // Always update internal state even if not on search view
                 const onSearch = currentView === 'search';
                 if (d.status === 'downloading') {
                     if (onSearch) { downloadProgressWrap.classList.remove('hidden'); downloadProgressFill.style.width = d.percent + '%'; downloadProgressText.textContent = d.percent + '%'; downloadStatus.textContent = 'Downloading...'; }
@@ -361,9 +446,6 @@
         }, 800);
     }
 
-    searchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && suggestIndex < 0) { e.preventDefault(); doSearch(); }
-    });
     downloadBtn.addEventListener('click', doDownload);
     $('#btnShuffle')?.addEventListener('click', () => { isShuffle = !isShuffle; $('#btnShuffle').classList.toggle('active', isShuffle); showToast(isShuffle ? 'Shuffle on' : 'Shuffle off'); });
     $('#btnRepeat')?.addEventListener('click', () => { isRepeat = !isRepeat; $('#btnRepeat').classList.toggle('active', isRepeat); showToast(isRepeat ? 'Repeat on' : 'Repeat off'); });
@@ -435,6 +517,90 @@
         playSong(library[currentSongIndex].filename, library[currentSongIndex].title);
     }
 
+    async function submitImport() {
+        const url = $('#importInput').value.trim();
+        if (!url) return;
+        $('#importStatus').textContent = 'Submitting...';
+        showLoading('Processing Link...');
+        try {
+            const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+            const d = await r.json();
+            if (d.error) { $('#importStatus').textContent = d.error; showToast(d.error, 'error'); return; }
+            showToast('Batch submitted!', 'success');
+            $('#importInput').value = '';
+            showView('batches');
+        } catch { $('#importStatus').textContent = 'Submission failed'; showToast('Failed', 'error'); }
+        finally { hideLoading(); }
+    }
+
+    async function refreshBatches() {
+        try {
+            const r = await fetch('/api/import/list');
+            batches = await r.json();
+            renderBatches();
+            $('#batchBadge').textContent = batches.filter(b => b.state === 'DOWNLOADING' || b.state === 'AWAITING_USER').length || '';
+        } catch { }
+    }
+
+    function renderBatches() {
+        if (!batches.length) { $('#batchList').innerHTML = '<div class="library-empty">No imports.</div>'; return; }
+        $('#batchList').innerHTML = batches.map((b, i) => {
+            const pct = b.totalTracks > 0 ? (b.completedCount / b.totalTracks * 100).toFixed(0) : 0;
+            return `<div class="batch-item ${i === batchesIndex ? 'selected' : ''}" data-id="${b.id}">
+                <div class="batch-item-title">Batch ${b.id.substring(0, 8)}</div>
+                <div class="batch-item-meta"><span>${b.state}</span><span>${b.completedCount}/${b.totalTracks} songs</span></div>
+                <div class="batch-item-progress"><div class="batch-item-fill" style="width: ${pct}%"></div></div>
+            </div>`;
+        }).join('');
+    }
+
+    async function refreshBatchDetail() {
+        if (!activeBatchId) return;
+        try {
+            const r = await fetch('/api/import/status/' + activeBatchId);
+            const d = await r.json();
+            batchTracks = d.tracks || [];
+            $('#batchDetailTitle').textContent = `Import ${activeBatchId.substring(0, 8)}`;
+            $('#batchDetailStats').textContent = `${d.batch.completedCount}/${d.batch.totalTracks} songs · ${d.batch.state}`;
+            renderBatchTracks();
+        } catch { }
+    }
+
+    function renderBatchTracks() {
+        $('#batchTrackList').innerHTML = batchTracks.map((t, i) => {
+            const sc = 'status-' + t.status.toLowerCase().replace(/_/g, '-');
+            return `<div class="track-item ${i === batchTracksIndex ? 'selected' : ''}" data-id="${t.id}">
+                <div class="track-thumb"></div>
+                <div class="track-info"><div class="track-title">${escH(t.title)}</div><div class="track-status-pill ${sc}">${t.status}</div></div>
+            </div>`;
+        }).join('');
+    }
+
+    function batchesUp() { batchesIndex = Math.max(0, batchesIndex - 1); renderBatches(); }
+    function batchesDown() { batchesIndex = Math.min(batches.length - 1, batchesIndex + 1); renderBatches(); }
+    function batchesSelect() {
+        const b = batches[batchesIndex];
+        if (!b) return;
+        activeBatchId = b.id;
+        batchTracksIndex = 0;
+        showView('batchDetail');
+    }
+
+    function tracksUp() { batchTracksIndex = Math.max(0, batchTracksIndex - 1); renderBatchTracks(); }
+    function tracksDown() { batchTracksIndex = Math.min(batchTracks.length - 1, batchTracksIndex + 1); renderBatchTracks(); }
+    async function tracksSelect() {
+        const t = batchTracks[batchTracksIndex];
+        if (!t) return;
+        if (t.status === 'MATCHED_LOW_CONFIDENCE') {
+            activeTrackId = t.id;
+            $('#actionMenuHeader').textContent = t.title.substring(0, 15) + (t.title.length > 15 ? '...' : '');
+            showView('actionMenu');
+        }
+    }
+
+    $('#importSubmitBtn').addEventListener('click', submitImport);
+    $('#importInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitImport(); });
+
     function prevTrack() {
         if (audio.currentTime > 3) { audio.currentTime = 0; return; }
         if (!library.length) return;
@@ -473,6 +639,10 @@
         if (currentView === 'menu') menuSelect();
         else if (currentView === 'library') libSelect();
         else if (currentView === 'nowplaying') togglePlay();
+        else if (currentView === 'import') submitImport();
+        else if (currentView === 'batches') batchesSelect();
+        else if (currentView === 'batchDetail') tracksSelect();
+        else if (currentView === 'actionMenu') actionMenuSelect();
     });
 
     const wheel = $('#clickWheel');
@@ -486,24 +656,18 @@
     }, { passive: false });
     wheel?.addEventListener('touchend', () => { lastAngle = null; });
 
-    // ─── Haptic + Click sound for dial ─────────────────────────────
     let audioCtx = null;
     function dialTick() {
-        // Haptic: short strong vibration
         if (navigator.vibrate) navigator.vibrate(8);
-        // Click sound via Web Audio API
         try {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = 3000;
+            osc.type = 'sine'; osc.frequency.value = 3000;
             gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(audioCtx.currentTime);
-            osc.stop(audioCtx.currentTime + 0.03);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.03);
         } catch (_) { }
     }
 
@@ -512,8 +676,9 @@
         dialTick();
         if (currentView === 'menu') { dir > 0 ? menuDown() : menuUp(); }
         else if (currentView === 'library') { dir > 0 ? libDown() : libUp(); }
+        else if (currentView === 'batches') { dir > 0 ? batchesDown() : batchesUp(); }
+        else if (currentView === 'batchDetail') { dir > 0 ? tracksDown() : tracksUp(); }
         else if (currentView === 'nowplaying') {
-            // Dial rotation seeks playback: clockwise (dir>0) = forward, counter-clockwise = backward
             if (audio.duration) {
                 audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + dir * 5));
                 showToast(fmt(audio.currentTime) + ' / ' + fmt(audio.duration));
@@ -532,7 +697,7 @@
             case 'Escape': case 'Backspace': if (document.activeElement !== searchInput) { e.preventDefault(); goBack(); } break;
             case ' ': if (document.activeElement !== searchInput) { e.preventDefault(); togglePlay(); } break;
             case 'Delete': if (currentView === 'library' && library[libraryIndex]) { e.preventDefault(); deleteSong(library[libraryIndex].filename); } break;
-            case 't': case 'T': if (document.activeElement !== searchInput) { currentThemeIndex = (currentThemeIndex + 1) % themes.length; applyTheme(); showToast(themes[currentThemeIndex].name); } break;
+            case 't': case 'T': if (document.activeElement !== searchInput) cycleTheme(); break;
         }
     });
 

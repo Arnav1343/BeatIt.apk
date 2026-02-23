@@ -24,6 +24,10 @@ class MusicServerService : Service() {
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BeatIt::DownloadLock")
         wakeLock?.acquire()
 
+        val musicDir = getExternalFilesDir(android.os.Environment.DIRECTORY_MUSIC) 
+            ?: File(filesDir, "Music")
+        BatchManager.init(this, musicDir)
+
         server = BeatItServer(this, 8080)
         server?.start()
     }

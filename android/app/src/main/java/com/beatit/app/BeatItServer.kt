@@ -26,6 +26,10 @@ class BeatItServer(private val context: Context, port: Int) : NanoHTTPD(port) {
                 method == Method.POST && uri == "/api/download" -> handleDownload(session)
                 method == Method.POST && uri == "/api/prefetch" -> handlePrefetch(session)
                 uri.startsWith("/api/progress/") -> handleProgress(uri)
+                method == Method.POST && uri == "/api/import" -> handleImport(session)
+                uri == "/api/import/list" -> handleImportList()
+                uri.startsWith("/api/import/status/") -> handleImportStatus(uri)
+                method == Method.POST && uri == "/api/import/action" -> handleImportAction(session)
                 uri == "/api/library" -> handleLibrary()
                 uri.startsWith("/api/music/") -> handleMusic(uri)
                 method == Method.POST && uri == "/api/delete" -> handleDelete(session)
@@ -160,6 +164,66 @@ class BeatItServer(private val context: Context, port: Int) : NanoHTTPD(port) {
 
     private fun jsonError(msg: String): Response =
         newFixedLengthResponse(Response.Status.OK, "application/json", gson.toJson(mapOf("error" to msg)))
+
+    // ── API: Batch Import ──────────────────────────────────────────
+
+    private fun handleImport(session: IHTTPSession): Response {
+        val body = readBody(session)
+        val url = gson.fromJson(body, Map::class.java)["url"] as? String ?: return jsonError("No URL")
+        val platform = PlatformDetector.detectPlatform(url) ?: return jsonError("Unsupported platform or invalid URL")
+        
+        BatchManager.submitBatch(url, platform)
+        return jsonOk(mapOf("success" to true))
+    }
+
+    private fun handleImportList(): Response {
+        val dao = AppDatabase.getDatabase(context).batchDao()
+        val batches = runBlocking { dao.getAllBatches() }
+        return jsonOk(batches)
+    }
+
+    private fun handleImportStatus(uri: String): Response {
+        val batchId = uri.removePrefix("/api/import/status/")
+        val dao = AppDatabase.getDatabase(context).batchDao()
+        val data = runBlocking { dao.getBatchWithTracks(batchId) } ?: return jsonError("Batch not found")
+        
+        return jsonOk(mapOf(
+            "batch" to data.batch,
+            "tracks" to data.tracks
+        ))
+    }
+
+    private fun handleImportAction(session: IHTTPSession): Response {
+        val body = readBody(session)
+        val map = gson.fromJson(body, Map::class.java)
+        val trackId = map["track_id"] as? String ?: return jsonError("No track_id")
+        val action = map["action"] as? String ?: return jsonError("No action")
+        val videoId = map["video_id"] as? String
+        
+        val dao = AppDatabase.getDatabase(context).batchDao()
+        val track = runBlocking { dao.getTrack(trackId) } ?: return jsonError("Track not found")
+
+        val nextStatus = when (action) {
+            "accept" -> {
+                if (videoId != null) track.youtubeVideoId = videoId
+                TrackStatus.MATCHED
+            }
+            "rematch" -> TrackStatus.MATCHING
+            "manual" -> TrackStatus.MATCHING_MANUAL
+            else -> return jsonError("Invalid action")
+        }
+        
+        runBlocking { 
+            if (videoId != null) {
+                dao.updateTrack(track)
+            }
+            BatchManager.transition(trackId, nextStatus)
+            if (nextStatus == TrackStatus.MATCHED) {
+                BatchManager.transition(trackId, TrackStatus.QUEUED)
+            }
+        }
+        return jsonOk(mapOf("success" to true))
+    }
 
     private fun humanSize(bytes: Long): String = when {
         bytes < 1024 -> "${bytes} B"

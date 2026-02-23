@@ -35,6 +35,24 @@
               </svg>
               <span>Library</span><span class="menu-badge" id="libraryBadge"></span><span class="menu-arrow">›</span>
             </div>
+            <div class="menu-item" data-action="import">
+              <svg class="menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+              </svg>
+              <span>Import Link</span><span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-item" data-action="batches">
+              <svg class="menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7,10 12,15 17,10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Active Downloads</span><span class="menu-badge" id="batchBadge"></span><span
+                class="menu-arrow">›</span>
+            </div>
             <div class="menu-item" data-action="nowplaying">
               <svg class="menu-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5,3 19,12 5,21" />
@@ -96,6 +114,47 @@
         <div class="view" id="viewLibrary">
           <div class="library-list" id="libraryList">
             <div class="library-empty">No songs yet.<br>Search & download!</div>
+          </div>
+        </div>
+
+        <!-- IMPORT VIEW -->
+        <div class="view" id="viewImport">
+          <div class="search-container">
+            <input type="text" id="importInput" placeholder="Paste link (YouTube/Spotify)..." autocomplete="off"
+              spellcheck="false">
+          </div>
+          <div class="import-instructions">
+            Supports YouTube playlists, Spotify albums, and Apple Music links.
+          </div>
+          <button id="importSubmitBtn" class="download-btn"><span>Submit Link</span></button>
+          <div id="importStatus" class="download-status"></div>
+        </div>
+
+        <!-- BATCHES VIEW -->
+        <div class="view" id="viewBatches">
+          <div class="batch-list" id="batchList">
+            <div class="library-empty">No active imports.</div>
+          </div>
+        </div>
+
+        <!-- BATCH DETAIL VIEW -->
+        <div class="view" id="viewBatchDetail">
+          <div class="batch-detail-header">
+            <div class="batch-detail-title" id="batchDetailTitle">Import</div>
+            <div class="batch-detail-stats" id="batchDetailStats">0/0 songs</div>
+          </div>
+          <div class="batch-track-list" id="batchTrackList"></div>
+        </div>
+
+        <!-- ACTION MENU VIEW -->
+        <div class="view" id="viewActionMenu">
+          <div class="menu-header" id="actionMenuHeader">Action</div>
+          <div class="menu-list" id="actionMenuList">
+            <div class="menu-item selected" data-action="accept"><span>Accept Result</span><span
+                class="menu-arrow">›</span></div>
+            <div class="menu-item" data-action="rematch"><span>Try Again</span><span class="menu-arrow">›</span></div>
+            <div class="menu-item" data-action="manual"><span>Manual Search</span><span class="menu-arrow">›</span>
+            </div>
           </div>
         </div>
 
